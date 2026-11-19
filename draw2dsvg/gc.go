@@ -4,12 +4,13 @@
 package draw2dsvg
 
 import (
-		"github.com/golang/freetype/truetype"
+	"github.com/golang/freetype/truetype"
 	"github.com/llgcode/draw2d"
 	"github.com/llgcode/draw2d/draw2dbase"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"image"
+	"image/color"
 	"log"
 	"math"
 	"strconv"
@@ -49,6 +50,13 @@ func NewGraphicContext(svg *Svg) *GraphicContext {
 // Clear fills the current canvas with a default transparent color
 func (gc *GraphicContext) Clear() {
 	gc.svg.Groups = nil
+}
+
+// SetFillLinearGradient sets the fill brush to a linear gradient. It is
+// emitted as a <linearGradient> definition with gradientUnits="userSpaceOnUse"
+// and the equivalent spreadMethod.
+func (gc *GraphicContext) SetFillLinearGradient(g *draw2d.LinearGradient) {
+	gc.StackGraphicContext.SetFillLinearGradient(g)
 }
 
 // Stroke strokes the paths with the color specified by SetStrokeColor
@@ -290,7 +298,11 @@ func (gc *GraphicContext) newGroup(drawType drawType) *Group {
 	}
 
 	if drawType&filled == filled {
-		group.Fill = toSvgRGBA(gc.Current.FillColor)
+		if gc.Current.FillGradient.Usable() {
+			group.Fill = "url(#" + gc.newGradient(gc.Current.FillGradient).Id + ")"
+		} else {
+			group.Fill = toSvgRGBA(gc.Current.FillColor)
+		}
 		group.FillRule = toSvgFillRule(gc.Current.FillRule)
 	}
 
@@ -300,6 +312,42 @@ func (gc *GraphicContext) newGroup(drawType drawType) *Group {
 	gc.svg.Groups = append(gc.svg.Groups, &group)
 
 	return &group
+}
+
+// newGradient appends an SVG linearGradient definition derived from g and
+// returns it. The gradient is re-emitted on every fill so that two fills with
+// the same gradient object stay independent and draw-order safe.
+func (gc *GraphicContext) newGradient(g *draw2d.LinearGradient) *LinearGradient {
+	norm := g.Normalize()
+	svgGrad := &LinearGradient{
+		X1:            optiSprintf("%F", norm.X0),
+		Y1:            optiSprintf("%F", norm.Y0),
+		X2:            optiSprintf("%F", norm.X1),
+		Y2:            optiSprintf("%F", norm.Y1),
+		GradientUnits: "userSpaceOnUse",
+		SpreadMethod:  norm.Extend.String(),
+	}
+	if norm.Extend == draw2d.ExtendPad {
+		// pad is the SVG default; keep the output compact.
+		svgGrad.SpreadMethod = ""
+	}
+	for _, s := range norm.Stops {
+		// SVG stop-color is a straight (non premultiplied) color, so convert
+		// to NRGBA first; RGBA() would premultiply and darken semi
+		// transparent stops.
+		nc := color.NRGBAModel.Convert(s.Color).(color.NRGBA)
+		stop := &Stop{
+			Offset:    optiSprintf("%F", s.Offset),
+			StopColor: optiSprintf("#%02X%02X%02X", nc.R, nc.G, nc.B),
+		}
+		if nc.A != 255 {
+			stop.StopOpacity = optiSprintf("%F", float64(nc.A)/255)
+		}
+		svgGrad.Stops = append(svgGrad.Stops, stop)
+	}
+	gc.svg.LinearGradients = append(gc.svg.LinearGradients, svgGrad)
+	svgGrad.Id = "gradient-" + strconv.Itoa(len(gc.svg.LinearGradients))
+	return svgGrad
 }
 
 // creates new mask attached to svg

@@ -27,11 +27,14 @@ type ContextStack struct {
 	DashOffset  float64
 	StrokeColor color.Color
 	FillColor   color.Color
-	FillRule    draw2d.FillRule
-	Cap         draw2d.LineCap
-	Join        draw2d.LineJoin
-	FontSize    float64
-	FontData    draw2d.FontData
+	// FillGradient is the linear gradient brush installed with
+	// SetFillLinearGradient. It is nil when the solid FillColor is used.
+	FillGradient *draw2d.LinearGradient
+	FillRule     draw2d.FillRule
+	Cap          draw2d.LineCap
+	Join         draw2d.LineJoin
+	FontSize     float64
+	FontData     draw2d.FontData
 
 	Font *truetype.Font
 	// fontSize and dpi are used to calculate scale. scale is the number of
@@ -97,6 +100,17 @@ func (gc *StackGraphicContext) SetStrokeColor(c color.Color) {
 
 func (gc *StackGraphicContext) SetFillColor(c color.Color) {
 	gc.Current.FillColor = c
+	gc.Current.FillGradient = nil
+}
+
+// SetFillLinearGradient sets the fill brush to a linear gradient. nil restores
+// the solid fill color.
+func (gc *StackGraphicContext) SetFillLinearGradient(g *draw2d.LinearGradient) {
+	if g == nil {
+		gc.Current.FillGradient = nil
+		return
+	}
+	gc.Current.FillGradient = g.Normalize()
 }
 
 func (gc *StackGraphicContext) SetFillRule(f draw2d.FillRule) {
@@ -183,6 +197,9 @@ func (gc *StackGraphicContext) Save() {
 	context.LineWidth = gc.Current.LineWidth
 	context.StrokeColor = gc.Current.StrokeColor
 	context.FillColor = gc.Current.FillColor
+	if gc.Current.FillGradient != nil {
+		context.FillGradient = gc.Current.FillGradient.Normalize()
+	}
 	context.FillRule = gc.Current.FillRule
 	context.Dash = gc.Current.Dash
 	context.DashOffset = gc.Current.DashOffset

@@ -30,8 +30,14 @@ type GraphicContext interface {
 	Scale(sx, sy float64)
 	// SetStrokeColor sets the current stroke color
 	SetStrokeColor(c color.Color)
-	// SetFillColor sets the current fill color
+	// SetFillColor sets the current fill color and disables any fill gradient
 	SetFillColor(c color.Color)
+	// SetFillLinearGradient sets the current fill brush to a linear gradient.
+	// Passing nil restores the solid fill color set with SetFillColor.
+	//
+	// The image and SVG backends implement the brush. Backends that have no
+	// gradient support (pdf, OpenGL) keep filling with the solid fill color.
+	SetFillLinearGradient(g *LinearGradient)
 	// SetFillRule sets the current fill rule
 	SetFillRule(f FillRule)
 	// SetLineWidth sets the current line width

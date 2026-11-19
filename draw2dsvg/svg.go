@@ -33,15 +33,16 @@ const (
 )
 
 type Svg struct {
-	XMLName  xml.Name `xml:"svg"`
-	Xmlns    string   `xml:"xmlns,attr"`
-	Width    string   `xml:"width,attr,omitempty"`
-	Height   string   `xml:"height,attr,omitempty"`
-	ViewBox  string   `xml:"viewBox,attr,omitempty"`
-	Fonts    []*Font  `xml:"defs>font"`
-	Masks    []*Mask  `xml:"defs>mask"`
-	Groups   []*Group `xml:"g"`
-	FontMode FontMode `xml:"-"`
+	XMLName         xml.Name          `xml:"svg"`
+	Xmlns           string            `xml:"xmlns,attr"`
+	Width           string            `xml:"width,attr,omitempty"`
+	Height          string            `xml:"height,attr,omitempty"`
+	ViewBox         string            `xml:"viewBox,attr,omitempty"`
+	Fonts           []*Font           `xml:"defs>font"`
+	Masks           []*Mask           `xml:"defs>mask"`
+	LinearGradients []*LinearGradient `xml:"defs>linearGradient"`
+	Groups          []*Group          `xml:"g"`
+	FontMode        FontMode          `xml:"-"`
 	FillStroke
 }
 
@@ -87,6 +88,26 @@ type Mask struct {
 	Identity
 	Position
 	Dimension
+}
+
+// LinearGradient is an SVG <linearGradient> element. Coordinates are in user
+// space (gradientUnits="userSpaceOnUse") and the stops carry their own alpha.
+type LinearGradient struct {
+	Id            string  `xml:"id,attr"`
+	X1            string  `xml:"x1,attr"`
+	Y1            string  `xml:"y1,attr"`
+	X2            string  `xml:"x2,attr"`
+	Y2            string  `xml:"y2,attr"`
+	GradientUnits string  `xml:"gradientUnits,attr"`
+	SpreadMethod  string  `xml:"spreadMethod,attr,omitempty"`
+	Stops         []*Stop `xml:"stop"`
+}
+
+// Stop is an SVG <stop> element. Offset is a normalized value ("0".."1").
+type Stop struct {
+	Offset      string `xml:"offset,attr"`
+	StopColor   string `xml:"stop-color,attr"`
+	StopOpacity string `xml:"stop-opacity,attr,omitempty"`
 }
 
 type Rect struct {

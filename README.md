@@ -18,6 +18,18 @@ Features
 
 Operations in draw2d include stroking and filling polygons, arcs, Bézier curves, drawing images and text rendering with truetype fonts. All drawing operations can be transformed by affine transformations (scale, rotation, translation).
 
+Paths can be filled with a linear gradient brush instead of a solid color. The
+gradient is defined in user space and supports the pad, repeat and reflect
+extend modes; the image and SVG backends render it identically:
+
+```go
+gc.SetFillLinearGradient(draw2d.NewLinearGradient(0, 0, 0, height, []draw2d.GradientStop{
+    {Offset: 0, Color: color.NRGBA{0x0a, 0x1d, 0x5c, 0xff}}, // deep blue sky
+    {Offset: 1, Color: color.NRGBA{0xf0, 0x7a, 0x1e, 0xff}}, // orange horizon
+}))
+// ... build a path, then gc.Fill() or gc.FillStroke()
+```
+
 Package draw2d follows the conventions of the [HTML Canvas 2D Context](http://www.w3.org/TR/2dcontext/) for coordinate system, angles, etc...
 
 Installation
