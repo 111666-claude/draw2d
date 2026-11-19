@@ -61,6 +61,9 @@ type Group struct {
 	Texts     []*Text  `xml:"text"`
 	Image     *Image   `xml:"image"`
 	Mask      string   `xml:"mask,attr,omitempty"`
+	// Style holds CSS declarations for the group. draw2d uses it for
+	// mix-blend-mode (blend modes) and opacity (layers).
+	Style string `xml:"style,attr,omitempty"`
 }
 
 type Path struct {

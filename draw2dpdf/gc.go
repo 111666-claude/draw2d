@@ -377,3 +377,38 @@ func (gc *GraphicContext) Restore() {
 	// c.Path unsupported
 	// c.Font unsupported
 }
+
+// SetBlendMode reports that the PDF backend does not support blend modes.
+//
+// draw2d.BlendNormal is always accepted because it is the backend's historical
+// behaviour. Any other mode is rejected with draw2d.ErrBlendUnsupported and
+// leaves the current mode unchanged; PDF output is never silently altered.
+func (gc *GraphicContext) SetBlendMode(mode draw2d.BlendMode) error {
+	if !mode.IsValid() {
+		return draw2d.ErrInvalidBlendMode
+	}
+	if mode != draw2d.BlendNormal {
+		return draw2d.ErrBlendUnsupported
+	}
+	return gc.StackGraphicContext.SetBlendMode(mode)
+}
+
+// BeginLayer reports that the PDF backend does not support layers. The
+// arguments are validated first, so an unknown mode and a non-finite opacity
+// keep their usual errors; any structurally valid layer is rejected with
+// draw2d.ErrBlendUnsupported.
+func (gc *GraphicContext) BeginLayer(mode draw2d.BlendMode, opacity float64) error {
+	if !mode.IsValid() {
+		return draw2d.ErrInvalidBlendMode
+	}
+	if _, err := draw2d.NormalizeOpacity(opacity); err != nil {
+		return err
+	}
+	return draw2d.ErrBlendUnsupported
+}
+
+// EndLayer reports that no layer is open, since the PDF backend rejects
+// every BeginLayer call.
+func (gc *GraphicContext) EndLayer() error {
+	return draw2d.ErrLayerNotOpen
+}

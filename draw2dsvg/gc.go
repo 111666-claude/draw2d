@@ -32,6 +32,17 @@ type GraphicContext struct {
 	glyphBuf   *truetype.GlyphBuf
 	svg        *Svg
 	DPI        int
+	// layers holds the currently open BeginLayer/EndLayer scopes.
+	layers []*svgLayer
+}
+
+// svgLayer is one open BeginLayer/EndLayer scope. Elements drawn while the
+// layer is open are appended to Group, then Group is appended to the
+// container current when the layer ends.
+type svgLayer struct {
+	mode    draw2d.BlendMode
+	opacity float64
+	group   *Group
 }
 
 func NewGraphicContext(svg *Svg) *GraphicContext {
@@ -42,12 +53,19 @@ func NewGraphicContext(svg *Svg) *GraphicContext {
 		&truetype.GlyphBuf{},
 		svg,
 		92,
+		nil,
 	}
 	return gc
 }
 
 // Clear fills the current canvas with a default transparent color
 func (gc *GraphicContext) Clear() {
+	// Discard all previously drawn elements, including those accumulated in
+	// open layers. Open layers stay open and will produce no element when
+	// they end unless something is drawn again.
+	for _, layer := range gc.layers {
+		layer.group.Groups = nil
+	}
 	gc.svg.Groups = nil
 }
 
@@ -138,12 +156,12 @@ func (gc *GraphicContext) ClearRect(x1, y1, x2, y2 int) {
 	mask := gc.newMask(x1, y1, x2-x1, y2-y1)
 
 	newGroup := &Group{
-		Groups: gc.svg.Groups,
+		Groups: gc.currentGroups(),
 		Mask:   "url(#" + mask.Id + ")",
 	}
 
-	// replace groups with new masked group
-	gc.svg.Groups = []*Group{newGroup}
+	// replace groups with new masked group, inside any open layer
+	gc.setCurrentGroups([]*Group{newGroup})
 }
 
 // NOTE following  two functions and soe other further below copied from dwra2d{img|gl}
@@ -295,9 +313,10 @@ func (gc *GraphicContext) newGroup(drawType drawType) *Group {
 	}
 
 	group.Transform = toSvgTransform(gc.Current.Tr)
+	group.Style = drawStyle(gc.Current.BlendMode)
 
 	// attach
-	gc.svg.Groups = append(gc.svg.Groups, &group)
+	gc.setCurrentGroups(append(gc.currentGroups(), &group))
 
 	return &group
 }

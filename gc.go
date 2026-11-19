@@ -34,6 +34,26 @@ type GraphicContext interface {
 	SetFillColor(c color.Color)
 	// SetFillRule sets the current fill rule
 	SetFillRule(f FillRule)
+	// SetBlendMode sets the blend mode used by subsequent drawing operations.
+	// It returns ErrInvalidBlendMode for an unknown mode and
+	// ErrBlendUnsupported if the backend cannot render blend modes; in both
+	// cases the current mode is left unchanged. Blend modes are part of the
+	// saved state.
+	SetBlendMode(mode BlendMode) error
+	// GetBlendMode returns the current blend mode.
+	GetBlendMode() BlendMode
+	// BeginLayer starts an isolated layer. Drawing operations are rendered
+	// into an offscreen surface (image backend) or a group (SVG backend) and
+	// are combined with the backdrop in EndLayer using mode and opacity.
+	// BeginLayer behaves like Save: the drawing state at the call is restored
+	// by EndLayer. It returns ErrInvalidBlendMode, ErrInvalidOpacity,
+	// ErrLayerDepthExceeded, ErrLayerTooLarge or ErrBlendUnsupported without
+	// changing the context when the layer cannot be opened.
+	BeginLayer(mode BlendMode, opacity float64) error
+	// EndLayer closes the innermost layer, composites it, and restores the
+	// drawing state saved by the matching BeginLayer. An empty layer produces
+	// no output. It returns ErrLayerNotOpen when no layer is open.
+	EndLayer() error
 	// SetLineWidth sets the current line width
 	SetLineWidth(lineWidth float64)
 	// SetLineCap sets the current line cap

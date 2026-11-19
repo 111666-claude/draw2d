@@ -32,6 +32,10 @@ type ContextStack struct {
 	Join        draw2d.LineJoin
 	FontSize    float64
 	FontData    draw2d.FontData
+	// BlendMode is the mode used to combine subsequent drawing
+	// operations with the destination. The zero value is
+	// draw2d.BlendNormal, which preserves the historical behaviour.
+	BlendMode draw2d.BlendMode
 
 	Font *truetype.Font
 	// fontSize and dpi are used to calculate scale. scale is the number of
@@ -46,7 +50,6 @@ func (cs *ContextStack) GetFontName() string {
 	fontData := cs.FontData
 	return fmt.Sprintf("%s:%d:%d:%9.2f", fontData.Name, fontData.Family, fontData.Style, cs.FontSize)
 }
-
 
 /**
  * Create a new Graphic context from an image
@@ -101,6 +104,23 @@ func (gc *StackGraphicContext) SetFillColor(c color.Color) {
 
 func (gc *StackGraphicContext) SetFillRule(f draw2d.FillRule) {
 	gc.Current.FillRule = f
+}
+
+// SetBlendMode sets the blend mode used by subsequent drawing operations.
+// The value is part of the saved state and is restored by Restore.
+// An unknown mode is rejected with draw2d.ErrInvalidBlendMode and leaves the
+// current state unchanged.
+func (gc *StackGraphicContext) SetBlendMode(mode draw2d.BlendMode) error {
+	if !mode.IsValid() {
+		return draw2d.ErrInvalidBlendMode
+	}
+	gc.Current.BlendMode = mode
+	return nil
+}
+
+// GetBlendMode returns the current blend mode.
+func (gc *StackGraphicContext) GetBlendMode() draw2d.BlendMode {
+	return gc.Current.BlendMode
 }
 
 func (gc *StackGraphicContext) SetLineWidth(lineWidth float64) {
@@ -191,6 +211,7 @@ func (gc *StackGraphicContext) Save() {
 	context.Path = gc.Current.Path.Copy()
 	context.Font = gc.Current.Font
 	context.Scale = gc.Current.Scale
+	context.BlendMode = gc.Current.BlendMode
 	copy(context.Tr[:], gc.Current.Tr[:])
 	context.Previous = gc.Current
 	gc.Current = context

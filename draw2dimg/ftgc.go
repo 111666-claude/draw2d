@@ -39,6 +39,11 @@ type GraphicContext struct {
 	glyphBuf         *truetype.GlyphBuf
 	DPI              int
 	Filter           ImageFilter
+	// MaxLayerPixels is the largest offscreen buffer, in pixels, BeginLayer
+	// may allocate. Zero uses draw2d.DefaultMaxLayerPixels.
+	MaxLayerPixels int
+	// layers holds the currently open BeginLayer/EndLayer scopes.
+	layers []*layer
 }
 
 // ImageFilter defines the type of filter to use
@@ -81,6 +86,8 @@ func NewGraphicContextWithPainter(img draw.Image, painter Painter) *GraphicConte
 		&truetype.GlyphBuf{},
 		dpi,
 		BilinearFilter,
+		0,
+		nil,
 	}
 	return gc
 }
@@ -99,7 +106,9 @@ func (gc *GraphicContext) Clear() {
 // ClearRect fills the current canvas with a default transparent color at the specified rectangle
 func (gc *GraphicContext) ClearRect(x1, y1, x2, y2 int) {
 	imageColor := image.NewUniform(gc.Current.FillColor)
-	draw.Draw(gc.img, image.Rect(x1, y1, x2, y2), imageColor, image.ZP, draw.Src)
+	r := image.Rect(x1, y1, x2, y2)
+	draw.Draw(gc.img, r, imageColor, image.ZP, draw.Src)
+	gc.markDirty(r)
 }
 
 // DrawImage draws an image into dest using an affine transformation matrix, an op and a filter
@@ -118,7 +127,33 @@ func DrawImage(src image.Image, dest draw.Image, tr draw2d.Matrix, op draw.Op, f
 
 // DrawImage draws the raster image in the current canvas
 func (gc *GraphicContext) DrawImage(img image.Image) {
+	if mode := gc.Current.BlendMode; mode != draw2d.BlendNormal {
+		area := gc.imageArea(img).Intersect(gc.img.Bounds())
+		if area.Empty() {
+			return
+		}
+		// Render the transformed image into a transparent buffer covering only
+		// the area it can touch, then blend that buffer with the canvas.
+		tmp := image.NewRGBA(area)
+		DrawImage(img, tmp, gc.Current.Tr, draw.Over, gc.Filter)
+		draw2dbase.Composite(gc.img, tmp, mode, 1)
+		gc.markDirty(area)
+		return
+	}
 	DrawImage(img, gc.img, gc.Current.Tr, draw.Over, gc.Filter)
+	if len(gc.layers) > 0 {
+		gc.markDirty(gc.imageArea(img))
+	}
+}
+
+// imageArea returns the canvas-space bounding rectangle an image can cover
+// under the current transform.
+func (gc *GraphicContext) imageArea(img image.Image) image.Rectangle {
+	src := img.Bounds()
+	x0, y0, x1, y1 := gc.Current.Tr.TransformRectangle(
+		float64(src.Min.X), float64(src.Min.Y), float64(src.Max.X), float64(src.Max.Y))
+	return image.Rect(int(math.Floor(x0)), int(math.Floor(y0)),
+		int(math.Ceil(x1)), int(math.Ceil(y1)))
 }
 
 // FillString draws the text at point (0, 0)
@@ -301,6 +336,17 @@ func (gc *GraphicContext) SetFontSize(fontSize float64) {
 }
 
 func (gc *GraphicContext) paint(rasterizer *raster.Rasterizer, color color.Color) {
+	if mode := gc.Current.BlendMode; mode != draw2d.BlendNormal {
+		// Blend each span directly with the backdrop, so anti-aliased edges
+		// carry the right coverage and no full-canvas buffer is needed.
+		painter := &blendPainter{dst: gc.img, mode: mode}
+		painter.SetColor(color)
+		rasterizer.Rasterize(painter)
+		rasterizer.Clear()
+		gc.markDirty(painter.dirty)
+		gc.Current.Path.Clear()
+		return
+	}
 	gc.painter.SetColor(color)
 	rasterizer.Rasterize(gc.painter)
 	rasterizer.Clear()
