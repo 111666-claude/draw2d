@@ -46,7 +46,11 @@ const (
 	CloseCmp
 )
 
-// Path stores points
+// Path stores points.
+//
+// The bounding box of the path's true geometry (not of its control points) is
+// available through Bounds, BoundsWithMatrix and the stroke-expanded variants;
+// see bounds.go.
 type Path struct {
 	// Components is a slice of PathCmp in a Path and mark the role of each points in the Path
 	Components []PathCmp
