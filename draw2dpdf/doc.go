@@ -27,6 +27,26 @@
 //   // Save to file
 //   draw2dpdf.SaveToPdfFile("hello.pdf", dest)
 //
+// Multi page documents
+//
+// Reports that span several pages use the PageDocument lifecycle instead
+// of NewPdf:
+//   doc, _ := draw2dpdf.NewMultiPagePdf("P", "mm", "A4")
+//   gc := doc.GraphicContext()
+//   for page := 0; page < 3; page++ {
+//       if err := doc.AddPage(); err != nil {
+//           log.Fatal(err)
+//       }
+//       // draw on gc: font, colors, line style and DPI carry over,
+//       // while the path and page transformation start fresh.
+//   }
+//   doc.SaveToFile("report.pdf")
+//
+// AddPageWithSize selects a per page size and orientation. Save/Restore,
+// Translate/Rotate/Scale, Clear/ClearRect and images only affect the
+// current page. Closing a document with an unclosed Save, an illegal page
+// size, an oversized page or a non positive DPI returns a typed error.
+//
 // There are more examples here:
 // https://github.com/llgcode/draw2d/tree/master/samples
 //
