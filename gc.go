@@ -40,6 +40,12 @@ type GraphicContext interface {
 	SetLineCap(cap LineCap)
 	// SetLineJoin sets the current line join
 	SetLineJoin(join LineJoin)
+	// SetMiterLimit sets the current miter limit: when the line join is
+	// MiterJoin, joins whose spike would extend further than this value
+	// times the line width are drawn with a bevel join instead
+	SetMiterLimit(miterLimit float64)
+	// GetMiterLimit gets the current miter limit
+	GetMiterLimit() float64
 	// SetLineDash sets the current dash
 	SetLineDash(dash []float64, dashOffset float64)
 	// SetFontSize sets the current font size

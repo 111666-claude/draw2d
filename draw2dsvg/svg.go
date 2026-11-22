@@ -170,6 +170,7 @@ type FillStroke struct {
 	StrokeWidth      string `xml:"stroke-width,attr,omitempty"`
 	StrokeLinecap    string `xml:"stroke-linecap,attr,omitempty"`
 	StrokeLinejoin   string `xml:"stroke-linejoin,attr,omitempty"`
+	StrokeMiterlimit string `xml:"stroke-miterlimit,attr,omitempty"`
 	StrokeDasharray  string `xml:"stroke-dasharray,attr,omitempty"`
 	StrokeDashoffset string `xml:"stroke-dashoffset,attr,omitempty"`
 }

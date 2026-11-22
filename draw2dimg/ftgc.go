@@ -314,6 +314,7 @@ func (gc *GraphicContext) Stroke(paths ...*draw2d.Path) {
 
 	stroker := draw2dbase.NewLineStroker(gc.Current.Cap, gc.Current.Join, draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: FtLineBuilder{Adder: gc.strokeRasterizer}})
 	stroker.HalfLineWidth = gc.Current.LineWidth / 2
+	stroker.MiterLimit = gc.Current.MiterLimit
 
 	var liner draw2dbase.Flattener
 	if gc.Current.Dash != nil && len(gc.Current.Dash) > 0 {
@@ -352,6 +353,7 @@ func (gc *GraphicContext) FillStroke(paths ...*draw2d.Path) {
 
 	stroker := draw2dbase.NewLineStroker(gc.Current.Cap, gc.Current.Join, draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: FtLineBuilder{Adder: gc.strokeRasterizer}})
 	stroker.HalfLineWidth = gc.Current.LineWidth / 2
+	stroker.MiterLimit = gc.Current.MiterLimit
 
 	var liner draw2dbase.Flattener
 	if gc.Current.Dash != nil && len(gc.Current.Dash) > 0 {

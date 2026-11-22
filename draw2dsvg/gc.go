@@ -283,6 +283,9 @@ func (gc *GraphicContext) newGroup(drawType drawType) *Group {
 		group.StrokeWidth = toSvgLength(gc.Current.LineWidth)
 		group.StrokeLinecap = gc.Current.Cap.String()
 		group.StrokeLinejoin = gc.Current.Join.String()
+		if gc.Current.Join == draw2d.MiterJoin {
+			group.StrokeMiterlimit = toSvgLength(draw2d.EffectiveMiterLimit(gc.Current.MiterLimit))
+		}
 		if len(gc.Current.Dash) > 0 {
 			group.StrokeDasharray = toSvgArray(gc.Current.Dash)
 			group.StrokeDashoffset = toSvgLength(gc.Current.DashOffset)

@@ -95,7 +95,10 @@
 // - https://github.com/vdobler/chart: basic charts in Go
 package draw2d
 
-import "image/color"
+import (
+	"image/color"
+	"math"
+)
 
 // FillRule defines the type for fill rules
 type FillRule int
@@ -156,6 +159,30 @@ func (join LineJoin) String() string {
 	}[join]
 }
 
+// DefaultMiterLimit is the default miter limit used when stroking paths
+// with a MiterJoin. It follows the PostScript, PDF and HTML canvas
+// convention: the miter of a join may extend up to DefaultMiterLimit times
+// the line width before it is replaced by a bevel join.
+const DefaultMiterLimit = 10.0
+
+// EffectiveMiterLimit converts a user provided miter limit into a safe,
+// finite value that can be used by the different backends:
+//   - non finite values (NaN, +Inf, -Inf) fall back to DefaultMiterLimit,
+//   - values below 1 are clamped to 1 (a miter never extends less than the
+//     half line width, so a limit below 1 would bevel every join anyway).
+//
+// The returned value is always finite and >= 1, so strokers using it never
+// produce unbounded coordinates.
+func EffectiveMiterLimit(miterLimit float64) float64 {
+	if math.IsNaN(miterLimit) || math.IsInf(miterLimit, 0) {
+		return DefaultMiterLimit
+	}
+	if miterLimit < 1 {
+		return 1
+	}
+	return miterLimit
+}
+
 // StrokeStyle keeps stroke style attributes
 // that is used by the Stroke method of a Drawer
 type StrokeStyle struct {
@@ -167,6 +194,9 @@ type StrokeStyle struct {
 	LineCap LineCap
 	// Line join style bevel, round or miter
 	LineJoin LineJoin
+	// MiterLimit limits the length of miter joins as a multiple of the
+	// line width; joins exceeding it are drawn with a bevel join instead
+	MiterLimit float64
 	// offset of the first dash
 	DashOffset float64
 	// array represented dash length pair values are plain dash and impair are space between dash

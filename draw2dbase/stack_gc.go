@@ -23,6 +23,7 @@ type ContextStack struct {
 	Tr          draw2d.Matrix
 	Path        *draw2d.Path
 	LineWidth   float64
+	MiterLimit  float64
 	Dash        []float64
 	DashOffset  float64
 	StrokeColor color.Color
@@ -47,7 +48,6 @@ func (cs *ContextStack) GetFontName() string {
 	return fmt.Sprintf("%s:%d:%d:%9.2f", fontData.Name, fontData.Family, fontData.Style, cs.FontSize)
 }
 
-
 /**
  * Create a new Graphic context from an image
  */
@@ -57,6 +57,7 @@ func NewStackGraphicContext() *StackGraphicContext {
 	gc.Current.Tr = draw2d.NewIdentityMatrix()
 	gc.Current.Path = new(draw2d.Path)
 	gc.Current.LineWidth = 1.0
+	gc.Current.MiterLimit = draw2d.DefaultMiterLimit
 	gc.Current.StrokeColor = image.Black
 	gc.Current.FillColor = image.White
 	gc.Current.Cap = draw2d.RoundCap
@@ -113,6 +114,19 @@ func (gc *StackGraphicContext) SetLineCap(cap draw2d.LineCap) {
 
 func (gc *StackGraphicContext) SetLineJoin(join draw2d.LineJoin) {
 	gc.Current.Join = join
+}
+
+// SetMiterLimit sets the miter limit used with MiterJoin: joins whose spike
+// would extend further than miterLimit times the line width are drawn with
+// a bevel join instead. Non finite or non positive values are tolerated and
+// resolved to a safe value when stroking (see draw2d.EffectiveMiterLimit).
+func (gc *StackGraphicContext) SetMiterLimit(miterLimit float64) {
+	gc.Current.MiterLimit = miterLimit
+}
+
+// GetMiterLimit gets the current miter limit
+func (gc *StackGraphicContext) GetMiterLimit() float64 {
+	return gc.Current.MiterLimit
 }
 
 func (gc *StackGraphicContext) SetLineDash(dash []float64, dashOffset float64) {
@@ -181,6 +195,7 @@ func (gc *StackGraphicContext) Save() {
 	context.FontSize = gc.Current.FontSize
 	context.FontData = gc.Current.FontData
 	context.LineWidth = gc.Current.LineWidth
+	context.MiterLimit = gc.Current.MiterLimit
 	context.StrokeColor = gc.Current.StrokeColor
 	context.FillColor = gc.Current.FillColor
 	context.FillRule = gc.Current.FillRule

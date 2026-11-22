@@ -322,6 +322,18 @@ func (gc *GraphicContext) SetLineJoin(Join draw2d.LineJoin) {
 	gc.pdf.SetLineJoinStyle(joins[Join])
 }
 
+// SetMiterLimit sets the miter limit used with the miter line join: joins
+// whose spike would extend further than miterLimit times the line width are
+// drawn with a bevel join instead. It maps to the PDF miter limit operator
+// (M). Non finite or non positive values are resolved to a safe value (see
+// draw2d.EffectiveMiterLimit).
+func (gc *GraphicContext) SetMiterLimit(miterLimit float64) {
+	gc.StackGraphicContext.SetMiterLimit(miterLimit)
+	if gc.pdf.PageNo() > 0 {
+		gc.pdf.RawWriteStr(strconv.FormatFloat(draw2d.EffectiveMiterLimit(miterLimit), 'f', -1, 64) + " M")
+	}
+}
+
 // Transformations
 
 // Scale generally scales the following text, drawings and images.
@@ -374,6 +386,9 @@ func (gc *GraphicContext) Restore() {
 	// gc.SetLineDash(c.Dash, c.DashOffset) // TODO
 	gc.SetLineCap(c.Cap)
 	gc.SetLineJoin(c.Join)
+	if c.Join == draw2d.MiterJoin {
+		gc.SetMiterLimit(c.MiterLimit)
+	}
 	// c.Path unsupported
 	// c.Font unsupported
 }
