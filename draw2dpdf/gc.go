@@ -6,6 +6,7 @@ package draw2dpdf
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -92,9 +93,25 @@ func NewGraphicContext(pdf *gofpdf.Fpdf) *GraphicContext {
 	return gc
 }
 
-// DrawImage draws an image as PNG
+// SupportedCompositeOps lists the compositing operations this backend
+// renders natively. gofpdf exposes PDF blend modes but no Porter-Duff
+// operators, so only CompositeOpOver is supported; any other operation
+// degrades to CompositeOpOver (see DrawImageWithOp).
+func (gc *GraphicContext) SupportedCompositeOps() []draw2d.CompositeOp {
+	return []draw2d.CompositeOp{draw2d.CompositeOpOver}
+}
+
+// DrawImage draws an image as PNG. Only CompositeOpOver is supported; if
+// the current compositing operation is something else the image is drawn
+// with CompositeOpOver and a warning is logged. Empty images are ignored.
 // TODO: add type (tp) as parameter to argument list?
 func (gc *GraphicContext) DrawImage(image image.Image) {
+	if image == nil || image.Bounds().Empty() {
+		return
+	}
+	if op := gc.Current.CompositeOp; op != draw2d.CompositeOpOver {
+		log.Printf("draw2dpdf: composite operation %s not supported, falling back to over", op)
+	}
 	name := strconv.Itoa(int(imageCount))
 	imageCount++
 	tp := "PNG" // "JPG", "JPEG", "PNG" and "GIF"
@@ -105,6 +122,21 @@ func (gc *GraphicContext) DrawImage(image image.Image) {
 	x0, y0 := float64(bounds.Min.X), float64(bounds.Min.Y)
 	w, h := float64(bounds.Dx()), float64(bounds.Dy())
 	gc.pdf.Image(name, x0, y0, w, h, false, tp, 0, "")
+}
+
+// DrawImageWithOp draws the raster image in the current document using the
+// given compositing operation. Only CompositeOpOver is supported by the pdf
+// backend; other operations return draw2d.ErrUnsupportedCompositeOp and
+// nothing is drawn.
+func (gc *GraphicContext) DrawImageWithOp(img image.Image, op draw2d.CompositeOp) error {
+	if !op.Valid() {
+		return fmt.Errorf("%w: %d", draw2d.ErrUnsupportedCompositeOp, int(op))
+	}
+	if op != draw2d.CompositeOpOver {
+		return fmt.Errorf("draw2dpdf: %w: %s", draw2d.ErrUnsupportedCompositeOp, op)
+	}
+	gc.DrawImage(img)
+	return nil
 }
 
 // Clear draws a white rectangle over the whole page

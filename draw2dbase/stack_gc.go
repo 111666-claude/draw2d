@@ -32,6 +32,8 @@ type ContextStack struct {
 	Join        draw2d.LineJoin
 	FontSize    float64
 	FontData    draw2d.FontData
+	// CompositeOp is the Porter-Duff compositing operation used by DrawImage
+	CompositeOp draw2d.CompositeOp
 
 	Font *truetype.Font
 	// fontSize and dpi are used to calculate scale. scale is the number of
@@ -64,6 +66,7 @@ func NewStackGraphicContext() *StackGraphicContext {
 	gc.Current.Join = draw2d.RoundJoin
 	gc.Current.FontSize = 10
 	gc.Current.FontData = DefaultFontData
+	gc.Current.CompositeOp = draw2d.CompositeOpOver
 	return gc
 }
 
@@ -101,6 +104,21 @@ func (gc *StackGraphicContext) SetFillColor(c color.Color) {
 
 func (gc *StackGraphicContext) SetFillRule(f draw2d.FillRule) {
 	gc.Current.FillRule = f
+}
+
+// SetCompositeOp sets the Porter-Duff compositing operation used by
+// DrawImage. Invalid operations are ignored: the previous operation is
+// kept, so the current operation is always valid.
+func (gc *StackGraphicContext) SetCompositeOp(op draw2d.CompositeOp) {
+	if !op.Valid() {
+		return
+	}
+	gc.Current.CompositeOp = op
+}
+
+// GetCompositeOp returns the current compositing operation.
+func (gc *StackGraphicContext) GetCompositeOp() draw2d.CompositeOp {
+	return gc.Current.CompositeOp
 }
 
 func (gc *StackGraphicContext) SetLineWidth(lineWidth float64) {
@@ -188,6 +206,7 @@ func (gc *StackGraphicContext) Save() {
 	context.DashOffset = gc.Current.DashOffset
 	context.Cap = gc.Current.Cap
 	context.Join = gc.Current.Join
+	context.CompositeOp = gc.Current.CompositeOp
 	context.Path = gc.Current.Path.Copy()
 	context.Font = gc.Current.Font
 	context.Scale = gc.Current.Scale

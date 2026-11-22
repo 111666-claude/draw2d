@@ -52,8 +52,16 @@ type GraphicContext interface {
 	GetFontData() FontData
 	// GetFontName gets the current FontData as a string
 	GetFontName() string
-	// DrawImage draws the raster image in the current canvas
+	// DrawImage draws the raster image in the current canvas using the
+	// current compositing operation (see SetCompositeOp)
 	DrawImage(image image.Image)
+	// SetCompositeOp sets the Porter-Duff compositing operation used by
+	// DrawImage. Invalid operations are ignored and the previous operation
+	// is kept. Backends that do not support an operation degrade to
+	// CompositeOpOver (see the CompositeOp documentation).
+	SetCompositeOp(op CompositeOp)
+	// GetCompositeOp returns the current compositing operation
+	GetCompositeOp() CompositeOp
 	// Save the context and push it to the context stack
 	Save()
 	// Restore remove the current context and restore the last one

@@ -108,17 +108,21 @@ func DrawImage(src image.Image, dest draw.Image, tr draw2d.Matrix, op draw.Op, f
 	switch filter {
 	case LinearFilter:
 		transformer = draw.NearestNeighbor
-	case BilinearFilter:
-		transformer = draw.BiLinear
 	case BicubicFilter:
 		transformer = draw.CatmullRom
+	default:
+		// BilinearFilter and unknown filters degrade to bilinear
+		transformer = draw.BiLinear
 	}
 	transformer.Transform(dest, f64.Aff3{tr[0], tr[1], tr[4], tr[2], tr[3], tr[5]}, src, src.Bounds(), op, nil)
 }
 
-// DrawImage draws the raster image in the current canvas
+// DrawImage draws the raster image in the current canvas using the current
+// compositing operation (see SetCompositeOp). Invalid draws (empty source,
+// non-finite transform, oversized target) are silently ignored; use
+// DrawImageWithOp to get them reported as errors.
 func (gc *GraphicContext) DrawImage(img image.Image) {
-	DrawImage(img, gc.img, gc.Current.Tr, draw.Over, gc.Filter)
+	DrawImageComposite(img, gc.img, gc.Current.Tr, gc.Current.CompositeOp, gc.Filter)
 }
 
 // FillString draws the text at point (0, 0)

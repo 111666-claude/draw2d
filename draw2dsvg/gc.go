@@ -9,6 +9,7 @@ import (
 	"github.com/llgcode/draw2d/draw2dbase"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
+	"fmt"
 	"image"
 	"log"
 	"math"
@@ -121,8 +122,24 @@ func (gc *GraphicContext) SetFontSize(fontSize float64) {
 	gc.recalc()
 }
 
-// DrawImage draws the raster image in the current canvas
+// SupportedCompositeOps lists the compositing operations this backend
+// renders natively. SVG output only supports CompositeOpOver; any other
+// operation degrades to CompositeOpOver (see DrawImageWithOp).
+func (gc *GraphicContext) SupportedCompositeOps() []draw2d.CompositeOp {
+	return []draw2d.CompositeOp{draw2d.CompositeOpOver}
+}
+
+// DrawImage draws the raster image in the current canvas. Only
+// CompositeOpOver is supported; if the current compositing operation is
+// something else the image is drawn with CompositeOpOver and a warning is
+// logged. Empty images are ignored.
 func (gc *GraphicContext) DrawImage(image image.Image) {
+	if image == nil || image.Bounds().Empty() {
+		return
+	}
+	if op := gc.Current.CompositeOp; op != draw2d.CompositeOpOver {
+		log.Printf("draw2dsvg: composite operation %s not supported, falling back to over", op)
+	}
 	bounds := image.Bounds()
 
 	svgImage := &Image{Href: imageToSvgHref(image)}
@@ -131,6 +148,21 @@ func (gc *GraphicContext) DrawImage(image image.Image) {
 	svgImage.Width = toSvgLength(float64(bounds.Max.X - bounds.Min.X))
 	svgImage.Height = toSvgLength(float64(bounds.Max.Y - bounds.Min.Y))
 	gc.newGroup(0).Image = svgImage
+}
+
+// DrawImageWithOp draws the raster image in the current canvas using the
+// given compositing operation. Only CompositeOpOver is supported by the svg
+// backend; other operations return draw2d.ErrUnsupportedCompositeOp and
+// nothing is drawn.
+func (gc *GraphicContext) DrawImageWithOp(img image.Image, op draw2d.CompositeOp) error {
+	if !op.Valid() {
+		return fmt.Errorf("%w: %d", draw2d.ErrUnsupportedCompositeOp, int(op))
+	}
+	if op != draw2d.CompositeOpOver {
+		return fmt.Errorf("draw2dsvg: %w: %s", draw2d.ErrUnsupportedCompositeOp, op)
+	}
+	gc.DrawImage(img)
+	return nil
 }
 
 // ClearRect fills the specified rectangle with a default transparent color
