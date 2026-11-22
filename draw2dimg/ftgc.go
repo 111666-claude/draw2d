@@ -39,6 +39,17 @@ type GraphicContext struct {
 	glyphBuf         *truetype.GlyphBuf
 	DPI              int
 	Filter           ImageFilter
+	// AlphaMode selects straight (legacy, default) versus premultiplied-alpha
+	// resampling for DrawImage. The zero value keeps the historical output
+	// unchanged; set it to PremulAlphaMode or LinearPremulAlphaMode to remove
+	// black fringes when scaling semi-transparent textures.
+	AlphaMode AlphaMode
+	// ColorSpace tells the resampler whether source channels are sRGB or
+	// already linear. It only affects LinearPremulAlphaMode.
+	ColorSpace ColorSpace
+	// MaxTaps bounds the per-axis kernel support when resampling. A non-positive
+	// value uses DefaultMaxTaps.
+	MaxTaps int
 }
 
 // ImageFilter defines the type of filter to use
@@ -71,16 +82,19 @@ func NewGraphicContextWithPainter(img draw.Image, painter Painter) *GraphicConte
 	width, height := img.Bounds().Dx(), img.Bounds().Dy()
 	dpi := 92
 	gc := &GraphicContext{
-		draw2dbase.NewStackGraphicContext(),
-		img,
-		painter,
-		raster.NewRasterizer(width, height),
-		raster.NewRasterizer(width, height),
-		draw2d.GetGlobalFontCache(),
-		draw2dbase.NewGlyphCache(),
-		&truetype.GlyphBuf{},
-		dpi,
-		BilinearFilter,
+		StackGraphicContext: draw2dbase.NewStackGraphicContext(),
+		img:                 img,
+		painter:             painter,
+		fillRasterizer:      raster.NewRasterizer(width, height),
+		strokeRasterizer:    raster.NewRasterizer(width, height),
+		FontCache:           draw2d.GetGlobalFontCache(),
+		glyphCache:          draw2dbase.NewGlyphCache(),
+		glyphBuf:            &truetype.GlyphBuf{},
+		DPI:                 dpi,
+		Filter:              BilinearFilter,
+		// AlphaMode, ColorSpace and MaxTaps keep their zero values: the
+		// legacy straight-alpha path and DefaultMaxTaps, so existing output
+		// is unchanged.
 	}
 	return gc
 }
@@ -118,7 +132,34 @@ func DrawImage(src image.Image, dest draw.Image, tr draw2d.Matrix, op draw.Op, f
 
 // DrawImage draws the raster image in the current canvas
 func (gc *GraphicContext) DrawImage(img image.Image) {
-	DrawImage(img, gc.img, gc.Current.Tr, draw.Over, gc.Filter)
+	if gc.AlphaMode == StraightAlphaMode {
+		DrawImage(img, gc.img, gc.Current.Tr, draw.Over, gc.Filter)
+		return
+	}
+	DrawImageWithOptions(img, gc.img, gc.Current.Tr, draw.Over, gc.Filter, &ResampleOptions{
+		AlphaMode:  gc.AlphaMode,
+		ColorSpace: gc.ColorSpace,
+		MaxTaps:    gc.MaxTaps,
+	})
+}
+
+// SetAlphaMode enables or disables the premultiplied-alpha resampling path
+// used by DrawImage. The default (StraightAlphaMode) preserves the legacy
+// output exactly.
+func (gc *GraphicContext) SetAlphaMode(mode AlphaMode) {
+	gc.AlphaMode = mode
+}
+
+// SetColorSpace sets the transfer encoding assumed by the linear-light
+// premultiplied resampling path.
+func (gc *GraphicContext) SetColorSpace(cs ColorSpace) {
+	gc.ColorSpace = cs
+}
+
+// SetMaxTaps caps the per-axis resampling kernel support. A non-positive
+// value restores the default cap.
+func (gc *GraphicContext) SetMaxTaps(maxTaps int) {
+	gc.MaxTaps = maxTaps
 }
 
 // FillString draws the text at point (0, 0)
@@ -294,7 +335,7 @@ func (gc *GraphicContext) SetFont(font *truetype.Font) {
 	gc.Current.Font = font
 }
 
-// SetFontSize sets the font size in points (as in ``a 12 point font'').
+// SetFontSize sets the font size in points (as in “a 12 point font”).
 func (gc *GraphicContext) SetFontSize(fontSize float64) {
 	gc.Current.FontSize = fontSize
 	gc.recalc()
