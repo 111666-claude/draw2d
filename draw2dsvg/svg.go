@@ -33,15 +33,16 @@ const (
 )
 
 type Svg struct {
-	XMLName  xml.Name `xml:"svg"`
-	Xmlns    string   `xml:"xmlns,attr"`
-	Width    string   `xml:"width,attr,omitempty"`
-	Height   string   `xml:"height,attr,omitempty"`
-	ViewBox  string   `xml:"viewBox,attr,omitempty"`
-	Fonts    []*Font  `xml:"defs>font"`
-	Masks    []*Mask  `xml:"defs>mask"`
-	Groups   []*Group `xml:"g"`
-	FontMode FontMode `xml:"-"`
+	XMLName   xml.Name          `xml:"svg"`
+	Xmlns     string            `xml:"xmlns,attr"`
+	Width     string            `xml:"width,attr,omitempty"`
+	Height    string            `xml:"height,attr,omitempty"`
+	ViewBox   string            `xml:"viewBox,attr,omitempty"`
+	Fonts     []*Font           `xml:"defs>font"`
+	Masks     []*Mask           `xml:"defs>mask"`
+	Gradients []*RadialGradient `xml:"defs>radialGradient"`
+	Groups    []*Group          `xml:"g"`
+	FontMode  FontMode          `xml:"-"`
 	FillStroke
 }
 
@@ -87,6 +88,29 @@ type Mask struct {
 	Identity
 	Position
 	Dimension
+}
+
+// RadialGradient is the svg radialGradient element. Coordinates use
+// userSpaceOnUse so the gradient is expressed in the same user space as
+// the paths it fills and follows their transforms.
+type RadialGradient struct {
+	Id            string  `xml:"id,attr"`
+	GradientUnits string  `xml:"gradientUnits,attr"`
+	Cx            float64 `xml:"cx,attr"`
+	Cy            float64 `xml:"cy,attr"`
+	R             float64 `xml:"r,attr"`
+	// Fx, Fy hold the effective (clamped) focal point.
+	Fx           float64 `xml:"fx,attr"`
+	Fy           float64 `xml:"fy,attr"`
+	SpreadMethod string  `xml:"spreadMethod,attr,omitempty"`
+	Stops        []*Stop `xml:"stop"`
+}
+
+// Stop is one svg gradient stop. Offset is a fraction in [0, 1].
+type Stop struct {
+	Offset  float64 `xml:"offset,attr"`
+	Color   string  `xml:"stop-color,attr"`
+	Opacity string  `xml:"stop-opacity,attr,omitempty"`
 }
 
 type Rect struct {

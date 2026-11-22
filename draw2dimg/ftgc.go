@@ -294,7 +294,7 @@ func (gc *GraphicContext) SetFont(font *truetype.Font) {
 	gc.Current.Font = font
 }
 
-// SetFontSize sets the font size in points (as in ``a 12 point font'').
+// SetFontSize sets the font size in points (as in “a 12 point font”).
 func (gc *GraphicContext) SetFontSize(fontSize float64) {
 	gc.Current.FontSize = fontSize
 	gc.recalc()
@@ -305,6 +305,21 @@ func (gc *GraphicContext) paint(rasterizer *raster.Rasterizer, color color.Color
 	rasterizer.Rasterize(gc.painter)
 	rasterizer.Clear()
 	gc.Current.Path.Clear()
+}
+
+// paintFill rasterizes the fill rasterizer with the current fill style:
+// the radial gradient when one is set, the solid fill color otherwise.
+func (gc *GraphicContext) paintFill(rasterizer *raster.Rasterizer) {
+	if g := gc.Current.FillGradient; g != nil {
+		inv := gc.Current.Tr.Copy()
+		inv.Inverse()
+		gp := &RadialGradientPainter{Image: gc.img, Gradient: g, Inv: inv}
+		rasterizer.Rasterize(gp)
+		rasterizer.Clear()
+		gc.Current.Path.Clear()
+		return
+	}
+	gc.paint(rasterizer, gc.Current.FillColor)
 }
 
 // Stroke strokes the paths with the color specified by SetStrokeColor
@@ -339,7 +354,7 @@ func (gc *GraphicContext) Fill(paths ...*draw2d.Path) {
 		draw2dbase.Flatten(p, flattener, gc.Current.Tr.GetScale())
 	}
 
-	gc.paint(gc.fillRasterizer, gc.Current.FillColor)
+	gc.paintFill(gc.fillRasterizer)
 }
 
 // FillStroke first fills the paths and than strokes them
@@ -366,7 +381,7 @@ func (gc *GraphicContext) FillStroke(paths ...*draw2d.Path) {
 	}
 
 	// Fill
-	gc.paint(gc.fillRasterizer, gc.Current.FillColor)
+	gc.paintFill(gc.fillRasterizer)
 	// Stroke
 	gc.paint(gc.strokeRasterizer, gc.Current.StrokeColor)
 }

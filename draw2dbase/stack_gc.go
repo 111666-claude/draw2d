@@ -27,11 +27,13 @@ type ContextStack struct {
 	DashOffset  float64
 	StrokeColor color.Color
 	FillColor   color.Color
-	FillRule    draw2d.FillRule
-	Cap         draw2d.LineCap
-	Join        draw2d.LineJoin
-	FontSize    float64
-	FontData    draw2d.FontData
+	// FillGradient, when non-nil, takes precedence over FillColor.
+	FillGradient *draw2d.RadialGradient
+	FillRule     draw2d.FillRule
+	Cap          draw2d.LineCap
+	Join         draw2d.LineJoin
+	FontSize     float64
+	FontData     draw2d.FontData
 
 	Font *truetype.Font
 	// fontSize and dpi are used to calculate scale. scale is the number of
@@ -46,7 +48,6 @@ func (cs *ContextStack) GetFontName() string {
 	fontData := cs.FontData
 	return fmt.Sprintf("%s:%d:%d:%9.2f", fontData.Name, fontData.Family, fontData.Style, cs.FontSize)
 }
-
 
 /**
  * Create a new Graphic context from an image
@@ -97,6 +98,15 @@ func (gc *StackGraphicContext) SetStrokeColor(c color.Color) {
 
 func (gc *StackGraphicContext) SetFillColor(c color.Color) {
 	gc.Current.FillColor = c
+	// Setting a solid fill color replaces any gradient fill.
+	gc.Current.FillGradient = nil
+}
+
+// SetFillGradient sets a radial gradient as the current fill pattern.
+// The gradient takes precedence over the solid fill color until a solid
+// color is set again with SetFillColor or nil is passed here.
+func (gc *StackGraphicContext) SetFillGradient(g *draw2d.RadialGradient) {
+	gc.Current.FillGradient = g
 }
 
 func (gc *StackGraphicContext) SetFillRule(f draw2d.FillRule) {
@@ -183,6 +193,7 @@ func (gc *StackGraphicContext) Save() {
 	context.LineWidth = gc.Current.LineWidth
 	context.StrokeColor = gc.Current.StrokeColor
 	context.FillColor = gc.Current.FillColor
+	context.FillGradient = gc.Current.FillGradient
 	context.FillRule = gc.Current.FillRule
 	context.Dash = gc.Current.Dash
 	context.DashOffset = gc.Current.DashOffset

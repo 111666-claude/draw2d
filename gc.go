@@ -32,6 +32,10 @@ type GraphicContext interface {
 	SetStrokeColor(c color.Color)
 	// SetFillColor sets the current fill color
 	SetFillColor(c color.Color)
+	// SetFillGradient sets a radial gradient as the current fill pattern.
+	// The gradient replaces the solid fill color until SetFillColor is
+	// called or nil is passed.
+	SetFillGradient(g *RadialGradient)
 	// SetFillRule sets the current fill rule
 	SetFillRule(f FillRule)
 	// SetLineWidth sets the current line width

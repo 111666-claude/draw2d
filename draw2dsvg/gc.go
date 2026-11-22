@@ -4,12 +4,13 @@
 package draw2dsvg
 
 import (
-		"github.com/golang/freetype/truetype"
+	"github.com/golang/freetype/truetype"
 	"github.com/llgcode/draw2d"
 	"github.com/llgcode/draw2d/draw2dbase"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"image"
+	"image/color"
 	"log"
 	"math"
 	"strconv"
@@ -290,7 +291,16 @@ func (gc *GraphicContext) newGroup(drawType drawType) *Group {
 	}
 
 	if drawType&filled == filled {
-		group.Fill = toSvgRGBA(gc.Current.FillColor)
+		switch g := gc.Current.FillGradient; {
+		case g == nil:
+			group.Fill = toSvgRGBA(gc.Current.FillColor)
+		case g.IsValid():
+			group.Fill = "url(#" + gc.svgGradient(g).Id + ")"
+		default:
+			// Invalid gradients (empty stops, non-finite geometry)
+			// paint nothing, matching the image backend.
+			group.Fill = "none"
+		}
 		group.FillRule = toSvgFillRule(gc.Current.FillRule)
 	}
 
@@ -300,6 +310,45 @@ func (gc *GraphicContext) newGroup(drawType drawType) *Group {
 	gc.svg.Groups = append(gc.svg.Groups, &group)
 
 	return &group
+}
+
+// svgGradient converts the gradient to an svg radialGradient element,
+// attaches it to the svg defs and returns it. The gradient uses
+// userSpaceOnUse coordinates so it is transformed together with the
+// paths referencing it, exactly like the image backend which evaluates
+// the gradient in user space.
+func (gc *GraphicContext) svgGradient(g *draw2d.RadialGradient) *RadialGradient {
+	fx, fy := g.Focus()
+	svgGrad := &RadialGradient{
+		GradientUnits: "userSpaceOnUse",
+		Cx:            g.Cx,
+		Cy:            g.Cy,
+		R:             g.Radius,
+		Fx:            fx,
+		Fy:            fy,
+	}
+	switch g.Spread {
+	case draw2d.RepeatSpread:
+		svgGrad.SpreadMethod = "repeat"
+	case draw2d.ReflectSpread:
+		svgGrad.SpreadMethod = "reflect"
+	default:
+		// pad is the svg default, omit it
+	}
+	for _, stop := range g.NormalizedStops() {
+		c := color.NRGBAModel.Convert(stop.Color).(color.NRGBA)
+		svgStop := &Stop{
+			Offset: stop.Position,
+			Color:  optiSprintf("#%02X%02X%02X", c.R, c.G, c.B),
+		}
+		if c.A != 0xff {
+			svgStop.Opacity = optiSprintf("%f", float64(c.A)/0xff)
+		}
+		svgGrad.Stops = append(svgGrad.Stops, svgStop)
+	}
+	gc.svg.Gradients = append(gc.svg.Gradients, svgGrad)
+	svgGrad.Id = "radialGradient-" + strconv.Itoa(len(gc.svg.Gradients))
+	return svgGrad
 }
 
 // creates new mask attached to svg
