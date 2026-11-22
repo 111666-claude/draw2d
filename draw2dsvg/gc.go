@@ -38,7 +38,7 @@ func NewGraphicContext(svg *Svg) *GraphicContext {
 	gc := &GraphicContext{
 		draw2dbase.NewStackGraphicContext(),
 		draw2d.GetGlobalFontCache(),
-		draw2dbase.NewGlyphCache(),
+		draw2dbase.NewDefaultSyncGlyphCache(),
 		&truetype.GlyphBuf{},
 		svg,
 		92,
@@ -108,6 +108,16 @@ func (gc *GraphicContext) SetDPI(dpi int) {
 
 func (gc *GraphicContext) GetDPI() int {
 	return gc.DPI
+}
+
+// SetGlyphCache replaces the glyph cache used by this graphic context. Passing
+// nil restores the default bounded concurrent cache.
+func (gc *GraphicContext) SetGlyphCache(cache draw2dbase.GlyphCache) {
+	if cache == nil {
+		gc.glyphCache = draw2dbase.NewDefaultSyncGlyphCache()
+		return
+	}
+	gc.glyphCache = cache
 }
 
 // SetFont sets the font used to draw text.

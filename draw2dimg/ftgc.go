@@ -77,7 +77,7 @@ func NewGraphicContextWithPainter(img draw.Image, painter Painter) *GraphicConte
 		raster.NewRasterizer(width, height),
 		raster.NewRasterizer(width, height),
 		draw2d.GetGlobalFontCache(),
-		draw2dbase.NewGlyphCache(),
+		draw2dbase.NewDefaultSyncGlyphCache(),
 		&truetype.GlyphBuf{},
 		dpi,
 		BilinearFilter,
@@ -88,6 +88,16 @@ func NewGraphicContextWithPainter(img draw.Image, painter Painter) *GraphicConte
 // GetDPI returns the resolution of the Image GraphicContext
 func (gc *GraphicContext) GetDPI() int {
 	return gc.DPI
+}
+
+// SetGlyphCache replaces the glyph cache used by this graphic context. Passing
+// nil restores the default bounded concurrent cache.
+func (gc *GraphicContext) SetGlyphCache(cache draw2dbase.GlyphCache) {
+	if cache == nil {
+		gc.glyphCache = draw2dbase.NewDefaultSyncGlyphCache()
+		return
+	}
+	gc.glyphCache = cache
 }
 
 // Clear fills the current canvas with a default transparent color

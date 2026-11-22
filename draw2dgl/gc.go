@@ -138,7 +138,7 @@ func NewGraphicContext(width, height int) *GraphicContext {
 		raster.NewRasterizer(width, height),
 		raster.NewRasterizer(width, height),
 		draw2d.GetGlobalFontCache(),
-		draw2dbase.NewGlyphCache(),
+		draw2dbase.NewDefaultSyncGlyphCache(),
 		&truetype.GlyphBuf{},
 		92,
 	}
@@ -316,6 +316,16 @@ func (gc *GraphicContext) SetFontSize(fontSize float64) {
 
 func (gc *GraphicContext) GetDPI() int {
 	return gc.DPI
+}
+
+// SetGlyphCache replaces the glyph cache used by this graphic context. Passing
+// nil restores the default bounded concurrent cache.
+func (gc *GraphicContext) SetGlyphCache(cache draw2dbase.GlyphCache) {
+	if cache == nil {
+		gc.glyphCache = draw2dbase.NewDefaultSyncGlyphCache()
+		return
+	}
+	gc.glyphCache = cache
 }
 
 //TODO

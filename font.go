@@ -77,11 +77,11 @@ func GetFont(fontData FontData) (font *truetype.Font) {
 }
 
 func GetFontFolder() string {
-	return defaultFonts.folder
+	return defaultLoader.Folder()
 }
 
 func SetFontFolder(folder string) {
-	defaultFonts.setFolder(filepath.Clean(folder))
+	defaultLoader.SetFolder(filepath.Clean(folder))
 }
 
 func GetGlobalFontCache() FontCache {
@@ -89,7 +89,7 @@ func GetGlobalFontCache() FontCache {
 }
 
 func SetFontNamer(fn FontFileNamer) {
-	defaultFonts.setNamer(fn)
+	defaultLoader.SetNamer(fn)
 }
 
 // Types implementing this interface can be passed to SetFontCache to change the
@@ -108,11 +108,11 @@ type FontCache interface {
 
 // Changes the font cache backend used by the package. After calling this
 // functionSetFontFolder and SetFontNamer will not affect anymore how fonts are
-// loaded.
+// loaded, unless the new cache is backed by the package's default loader.
 // To restore the default font cache, call this function passing nil as argument.
 func SetFontCache(cache FontCache) {
 	if cache == nil {
-		fontCache = defaultFonts
+		fontCache = defaultFontCache
 	} else {
 		fontCache = cache
 	}
@@ -223,7 +223,13 @@ func (cache *SyncFolderFontCache) Store(fontData FontData, font *truetype.Font) 
 }
 
 var (
-	defaultFonts = NewSyncFolderFontCache("../resource/font")
+	// defaultLoader resolves font files for the global font cache.
+	defaultLoader = NewFolderLoader("../resource/font")
 
-	fontCache FontCache = defaultFonts
+	// defaultFontCache is the global, concurrency-safe, bounded LRU font
+	// cache. Concurrent Loads of the same FontData parse the font at most
+	// once and evicted fonts are transparently reloaded.
+	defaultFontCache = NewDefaultSyncFontCacheFrom(defaultLoader)
+
+	fontCache FontCache = defaultFontCache
 )
