@@ -108,21 +108,15 @@ func (p *Path) CubicCurveTo(cx1, cy1, cx2, cy2, x, y float64) {
 
 // ArcTo adds an arc to the path
 func (p *Path) ArcTo(cx, cy, rx, ry, startAngle, angle float64) {
-	endAngle := startAngle + angle
-	clockWise := true
-	if angle < 0 {
-		clockWise = false
+	// Normalize the sweep to at most one full turn, in constant time.
+	// (Normalizing with a loop that adds 2π at a time hangs for huge or
+	// non-finite sweeps imported from external data.)
+	sweep := math.Mod(angle, 2*math.Pi)
+	if sweep == 0 && angle != 0 && !math.IsNaN(angle) {
+		// angle was a non-zero multiple of 2π: draw full circle(s).
+		sweep = math.Copysign(2*math.Pi, angle)
 	}
-	// normalize
-	if clockWise {
-		for endAngle < startAngle {
-			endAngle += math.Pi * 2.0
-		}
-	} else {
-		for startAngle < endAngle {
-			startAngle += math.Pi * 2.0
-		}
-	}
+	endAngle := startAngle + sweep
 	startX := cx + math.Cos(startAngle)*rx
 	startY := cy + math.Sin(startAngle)*ry
 	if len(p.Components) > 0 {
@@ -167,23 +161,48 @@ func (p *Path) IsEmpty() bool {
 func (p *Path) String() string {
 	s := ""
 	j := 0
+	// take returns the next n points, or false if the point stream is
+	// truncated (possible with externally imported, malformed paths)
+	take := func(n int) ([]float64, bool) {
+		if j+n > len(p.Points) {
+			return nil, false
+		}
+		pts := p.Points[j : j+n]
+		j += n
+		return pts, true
+	}
 	for _, cmd := range p.Components {
 		switch cmd {
 		case MoveToCmp:
-			s += fmt.Sprintf("MoveTo: %f, %f\n", p.Points[j], p.Points[j+1])
-			j = j + 2
+			if pts, ok := take(2); ok {
+				s += fmt.Sprintf("MoveTo: %f, %f\n", pts[0], pts[1])
+			} else {
+				return s + "MoveTo: <truncated points>\n"
+			}
 		case LineToCmp:
-			s += fmt.Sprintf("LineTo: %f, %f\n", p.Points[j], p.Points[j+1])
-			j = j + 2
+			if pts, ok := take(2); ok {
+				s += fmt.Sprintf("LineTo: %f, %f\n", pts[0], pts[1])
+			} else {
+				return s + "LineTo: <truncated points>\n"
+			}
 		case QuadCurveToCmp:
-			s += fmt.Sprintf("QuadCurveTo: %f, %f, %f, %f\n", p.Points[j], p.Points[j+1], p.Points[j+2], p.Points[j+3])
-			j = j + 4
+			if pts, ok := take(4); ok {
+				s += fmt.Sprintf("QuadCurveTo: %f, %f, %f, %f\n", pts[0], pts[1], pts[2], pts[3])
+			} else {
+				return s + "QuadCurveTo: <truncated points>\n"
+			}
 		case CubicCurveToCmp:
-			s += fmt.Sprintf("CubicCurveTo: %f, %f, %f, %f, %f, %f\n", p.Points[j], p.Points[j+1], p.Points[j+2], p.Points[j+3], p.Points[j+4], p.Points[j+5])
-			j = j + 6
+			if pts, ok := take(6); ok {
+				s += fmt.Sprintf("CubicCurveTo: %f, %f, %f, %f, %f, %f\n", pts[0], pts[1], pts[2], pts[3], pts[4], pts[5])
+			} else {
+				return s + "CubicCurveTo: <truncated points>\n"
+			}
 		case ArcToCmp:
-			s += fmt.Sprintf("ArcTo: %f, %f, %f, %f, %f, %f\n", p.Points[j], p.Points[j+1], p.Points[j+2], p.Points[j+3], p.Points[j+4], p.Points[j+5])
-			j = j + 6
+			if pts, ok := take(6); ok {
+				s += fmt.Sprintf("ArcTo: %f, %f, %f, %f, %f, %f\n", pts[0], pts[1], pts[2], pts[3], pts[4], pts[5])
+			} else {
+				return s + "ArcTo: <truncated points>\n"
+			}
 		case CloseCmp:
 			s += "Close\n"
 		}
@@ -195,21 +214,34 @@ func (p *Path) String() string {
 func (path *Path) VerticalFlip() *Path {
 	p := path.Copy()
 	j := 0
+	n := len(p.Points)
 	for _, cmd := range p.Components {
 		switch cmd {
 		case MoveToCmp, LineToCmp:
+			if j+2 > n {
+				return p
+			}
 			p.Points[j+1] = -p.Points[j+1]
 			j = j + 2
 		case QuadCurveToCmp:
+			if j+4 > n {
+				return p
+			}
 			p.Points[j+1] = -p.Points[j+1]
 			p.Points[j+3] = -p.Points[j+3]
 			j = j + 4
 		case CubicCurveToCmp:
+			if j+6 > n {
+				return p
+			}
 			p.Points[j+1] = -p.Points[j+1]
 			p.Points[j+3] = -p.Points[j+3]
 			p.Points[j+5] = -p.Points[j+5]
 			j = j + 6
 		case ArcToCmp:
+			if j+6 > n {
+				return p
+			}
 			p.Points[j+1] = -p.Points[j+1]
 			p.Points[j+3] = -p.Points[j+3]
 			p.Points[j+4] = -p.Points[j+4] // start angle

@@ -19,6 +19,21 @@ func (tr Matrix) Determinant() float64 {
 	return tr[0]*tr[3] - tr[1]*tr[2]
 }
 
+// IsInvertible reports whether the matrix can be inverted, i.e. all its
+// coefficients are finite and its determinant is finite and non-zero.
+// Callers must check this before using Inverse, InverseTransform or
+// InverseTransformPoint on matrices imported from external data, since
+// inverting a singular or non-finite matrix yields NaN/Inf coordinates.
+func (tr Matrix) IsInvertible() bool {
+	for _, v := range tr {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return false
+		}
+	}
+	d := tr.Determinant()
+	return d != 0 && !math.IsNaN(d) && !math.IsInf(d, 0)
+}
+
 // Transform applies the transformation matrix to points. It modify the points passed in parameter.
 func (tr Matrix) Transform(points []float64) {
 	for i, j := 0, 1; j < len(points); i, j = i+2, j+2 {

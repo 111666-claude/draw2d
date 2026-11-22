@@ -63,6 +63,7 @@ func TraceCubic(t Liner, cubic []float64, flatteningThreshold float64) error {
 	var c []float64
 
 	var dx, dy, d2, d3 float64
+	segments := 0
 
 	for i >= 0 {
 		c = curves[i:]
@@ -73,8 +74,12 @@ func TraceCubic(t Liner, cubic []float64, flatteningThreshold float64) error {
 		d3 = math.Abs((c[4]-c[6])*dy - (c[5]-c[7])*dx)
 
 		// if it's flat then trace a line
-		if (d2+d3)*(d2+d3) <= flatteningThreshold*(dx*dx+dy*dy) || i == len(curves)-8 {
-			t.LineTo(c[6], c[7])
+		if (d2+d3)*(d2+d3) <= flatteningThreshold*(dx*dx+dy*dy) || i == len(curves)-8 || segments >= maxTraceSegments {
+			// subdivision of huge coordinates can overflow to ±Inf
+			if isFinite(c[6], c[7]) {
+				t.LineTo(c[6], c[7])
+			}
+			segments++
 			i -= 8
 		} else {
 			// second half of bezier go lower onto the stack
@@ -121,6 +126,7 @@ func TraceQuad(t Liner, quad []float64, flatteningThreshold float64) error {
 	// current curve
 	var c []float64
 	var dx, dy, d float64
+	segments := 0
 
 	for i >= 0 {
 		c = curves[i:]
@@ -130,8 +136,12 @@ func TraceQuad(t Liner, quad []float64, flatteningThreshold float64) error {
 		d = math.Abs(((c[2]-c[4])*dy - (c[3]-c[5])*dx))
 
 		// if it's flat then trace a line
-		if (d*d) <= flatteningThreshold*(dx*dx+dy*dy) || i == len(curves)-6 {
-			t.LineTo(c[4], c[5])
+		if (d*d) <= flatteningThreshold*(dx*dx+dy*dy) || i == len(curves)-6 || segments >= maxTraceSegments {
+			// subdivision of huge coordinates can overflow to ±Inf
+			if isFinite(c[4], c[5]) {
+				t.LineTo(c[4], c[5])
+			}
+			segments++
 			i -= 6
 		} else {
 			// second half of bezier go lower onto the stack
@@ -151,14 +161,19 @@ func TraceArc(t Liner, x, y, rx, ry, start, angle, scale float64) (lastX, lastY 
 	}
 	ra := (math.Abs(rx) + math.Abs(ry)) / 2
 	da := math.Acos(ra/(ra+0.125/scale)) * 2
+	if !(da > 0) || math.IsInf(da, 0) {
+		// Degenerate arc (zero/NaN radii, infinite scale, ...): stepping is
+		// impossible, emit only the end point instead of looping forever.
+		return x + math.Cos(end)*rx, y + math.Sin(end)*ry
+	}
 	//normalize
 	if !clockWise {
 		da = -da
 	}
 	angle = start + da
 	var curX, curY float64
-	for {
-		if (angle < end-da/4) != clockWise {
+	for segments := 0; ; segments++ {
+		if segments >= maxTraceSegments || (angle < end-da/4) != clockWise {
 			curX = x + math.Cos(end)*rx
 			curY = y + math.Sin(end)*ry
 			return curX, curY
@@ -167,6 +182,9 @@ func TraceArc(t Liner, x, y, rx, ry, start, angle, scale float64) (lastX, lastY 
 		curY = y + math.Sin(angle)*ry
 
 		angle += da
-		t.LineTo(curX, curY)
+		// huge radii or centers can overflow to ±Inf
+		if isFinite(curX, curY) {
+			t.LineTo(curX, curY)
+		}
 	}
 }

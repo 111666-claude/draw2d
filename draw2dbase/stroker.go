@@ -44,9 +44,16 @@ func (l *LineStroker) line(x1, y1, x2, y2 float64) {
 	dx := (x2 - x1)
 	dy := (y2 - y1)
 	d := vectorDistance(dx, dy)
-	if d != 0 {
-		nx := dy * l.HalfLineWidth / d
-		ny := -(dx * l.HalfLineWidth / d)
+	// Skip degenerate or non-finite segments (NaN/Inf coordinates or line
+	// width) instead of emitting NaN vertices.
+	if d > 0 && !math.IsInf(d, 0) && isFinite(l.HalfLineWidth) {
+		// Divide before multiplying so a huge line width cannot overflow.
+		nx := dy / d * l.HalfLineWidth
+		ny := -(dx / d * l.HalfLineWidth)
+		// the offset points can still overflow to ±Inf
+		if !isFinite(x1+nx, y1+ny, x2+nx, y2+ny, x1-nx, y1-ny, x2-nx, y2-ny) {
+			return
+		}
 		l.appendVertex(x1+nx, y1+ny, x2+nx, y2+ny, x1-nx, y1-ny, x2-nx, y2-ny)
 		l.x, l.y, l.nx, l.ny = x2, y2, nx, ny
 	}

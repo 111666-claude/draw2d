@@ -28,40 +28,75 @@ type Flattener interface {
 }
 
 // Flatten convert curves into straight segments keeping join segments info
+//
+// Flatten is robust to malformed input: components whose points are missing,
+// non-finite (NaN or ±Inf), or structurally inconsistent (e.g. a curve with
+// no current point) are skipped instead of panicking or emitting NaN
+// vertices. A non-positive or non-finite scale is replaced by 1.
 func Flatten(path *draw2d.Path, flattener Flattener, scale float64) {
+	scale = sanitizeScale(scale)
 	// First Point
 	var startX, startY float64 = 0, 0
 	// Current Point
 	var x, y float64 = 0, 0
 	i := 0
+	n := len(path.Points)
 	for _, cmp := range path.Components {
 		switch cmp {
 		case draw2d.MoveToCmp:
-			x, y = path.Points[i], path.Points[i+1]
-			startX, startY = x, y
-			if i != 0 {
-				flattener.End()
+			if i+2 > n {
+				return
 			}
-			flattener.MoveTo(x, y)
+			if isFinite(path.Points[i], path.Points[i+1]) {
+				x, y = path.Points[i], path.Points[i+1]
+				startX, startY = x, y
+				if i != 0 {
+					flattener.End()
+				}
+				flattener.MoveTo(x, y)
+			}
 			i += 2
 		case draw2d.LineToCmp:
-			x, y = path.Points[i], path.Points[i+1]
-			flattener.LineTo(x, y)
-			flattener.LineJoin()
+			if i+2 > n {
+				return
+			}
+			if isFinite(path.Points[i], path.Points[i+1]) {
+				x, y = path.Points[i], path.Points[i+1]
+				flattener.LineTo(x, y)
+				flattener.LineJoin()
+			}
 			i += 2
 		case draw2d.QuadCurveToCmp:
-			TraceQuad(flattener, path.Points[i-2:], 0.5)
-			x, y = path.Points[i+2], path.Points[i+3]
-			flattener.LineTo(x, y)
+			if i < 2 || i+4 > n {
+				return
+			}
+			if isFinite(path.Points[i-2 : i+4]...) {
+				TraceQuad(flattener, path.Points[i-2:], 0.5)
+				x, y = path.Points[i+2], path.Points[i+3]
+				flattener.LineTo(x, y)
+			}
 			i += 4
 		case draw2d.CubicCurveToCmp:
-			TraceCubic(flattener, path.Points[i-2:], 0.5)
-			x, y = path.Points[i+4], path.Points[i+5]
-			flattener.LineTo(x, y)
+			if i < 2 || i+6 > n {
+				return
+			}
+			if isFinite(path.Points[i-2 : i+6]...) {
+				TraceCubic(flattener, path.Points[i-2:], 0.5)
+				x, y = path.Points[i+4], path.Points[i+5]
+				flattener.LineTo(x, y)
+			}
 			i += 6
 		case draw2d.ArcToCmp:
-			x, y = TraceArc(flattener, path.Points[i], path.Points[i+1], path.Points[i+2], path.Points[i+3], path.Points[i+4], path.Points[i+5], scale)
-			flattener.LineTo(x, y)
+			if i+6 > n {
+				return
+			}
+			if isFinite(path.Points[i : i+6]...) {
+				ax, ay := TraceArc(flattener, path.Points[i], path.Points[i+1], path.Points[i+2], path.Points[i+3], path.Points[i+4], path.Points[i+5], scale)
+				if isFinite(ax, ay) {
+					x, y = ax, ay
+					flattener.LineTo(x, y)
+				}
+			}
 			i += 6
 		case draw2d.CloseCmp:
 			flattener.LineTo(startX, startY)
@@ -80,13 +115,18 @@ type Transformer struct {
 func (t Transformer) MoveTo(x, y float64) {
 	u := x*t.Tr[0] + y*t.Tr[2] + t.Tr[4]
 	v := x*t.Tr[1] + y*t.Tr[3] + t.Tr[5]
-	t.Flattener.MoveTo(u, v)
+	// a finite point can still overflow to ±Inf through an extreme matrix
+	if isFinite(u, v) {
+		t.Flattener.MoveTo(u, v)
+	}
 }
 
 func (t Transformer) LineTo(x, y float64) {
 	u := x*t.Tr[0] + y*t.Tr[2] + t.Tr[4]
 	v := x*t.Tr[1] + y*t.Tr[3] + t.Tr[5]
-	t.Flattener.LineTo(u, v)
+	if isFinite(u, v) {
+		t.Flattener.LineTo(u, v)
+	}
 }
 
 func (t Transformer) LineJoin() {
