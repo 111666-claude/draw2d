@@ -248,10 +248,9 @@ func (gc *GraphicContext) drawPaths(drawType drawType, paths ...*draw2d.Path) {
 func (gc *GraphicContext) drawString(text string, drawType drawType, x, y float64) float64 {
 	switch gc.svg.FontMode {
 	case PathFontMode:
-		w := gc.CreateStringPath(text, x, y)
-		gc.drawPaths(drawType)
-		gc.Current.Path.Clear()
-		return w
+		return gc.drawStringAsPath(text, drawType, x, y)
+	case SelectableTextMode:
+		return gc.drawSelectableText(text, drawType, x, y)
 	case SvgFontMode:
 		gc.embedSvgFont(text)
 	}
