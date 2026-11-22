@@ -33,15 +33,16 @@ const (
 )
 
 type Svg struct {
-	XMLName  xml.Name `xml:"svg"`
-	Xmlns    string   `xml:"xmlns,attr"`
-	Width    string   `xml:"width,attr,omitempty"`
-	Height   string   `xml:"height,attr,omitempty"`
-	ViewBox  string   `xml:"viewBox,attr,omitempty"`
-	Fonts    []*Font  `xml:"defs>font"`
-	Masks    []*Mask  `xml:"defs>mask"`
-	Groups   []*Group `xml:"g"`
-	FontMode FontMode `xml:"-"`
+	XMLName  xml.Name   `xml:"svg"`
+	Xmlns    string     `xml:"xmlns,attr"`
+	Width    string     `xml:"width,attr,omitempty"`
+	Height   string     `xml:"height,attr,omitempty"`
+	ViewBox  string     `xml:"viewBox,attr,omitempty"`
+	Fonts    []*Font    `xml:"defs>font"`
+	Masks    []*Mask    `xml:"defs>mask"`
+	Patterns []*Pattern `xml:"defs>pattern"`
+	Groups   []*Group   `xml:"g"`
+	FontMode FontMode   `xml:"-"`
 	FillStroke
 }
 
@@ -81,12 +82,32 @@ type Image struct {
 	Position
 	Dimension
 	Href string `xml:"href,attr"`
+	// ImageRendering is the SVG image-rendering hint. It is "pixelated" for
+	// nearest-neighbour textures and empty for the default smoothing.
+	ImageRendering string `xml:"image-rendering,attr,omitempty"`
 }
 
 type Mask struct {
 	Identity
 	Position
 	Dimension
+}
+
+// Pattern is an SVG <pattern> element describing a tiled image. Geometry and
+// content are expressed in the image pixel coordinate system and
+// PatternTransform maps that system into user space, mirroring ImageTexture.
+// An axis that is not repeated is given a tile large enough that it never
+// wraps within a canvas; the area outside the image stays transparent.
+type Pattern struct {
+	Id               string   `xml:"id,attr"`
+	X                float64  `xml:"x,attr"`
+	Y                float64  `xml:"y,attr"`
+	Width            string   `xml:"width,attr"`
+	Height           string   `xml:"height,attr"`
+	PatternUnits     string   `xml:"patternUnits,attr,omitempty"`
+	ContentUnits     string   `xml:"patternContentUnits,attr,omitempty"`
+	PatternTransform string   `xml:"patternTransform,attr,omitempty"`
+	Images           []*Image `xml:"image"`
 }
 
 type Rect struct {

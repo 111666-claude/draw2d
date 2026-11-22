@@ -6,6 +6,7 @@ package draw2dimg
 import (
 	"image"
 	"image/color"
+	stddraw "image/draw"
 	"log"
 	"math"
 
@@ -307,6 +308,41 @@ func (gc *GraphicContext) paint(rasterizer *raster.Rasterizer, color color.Color
 	gc.Current.Path.Clear()
 }
 
+// fillPainter returns the raster.Painter to use for the current fill: the
+// texture painter when a usable image texture is installed, otherwise the
+// solid color painter.
+func (gc *GraphicContext) fillPainter() raster.Painter {
+	if gc.Current.FillTexture != nil {
+		img, ok := gc.img.(*image.RGBA)
+		if !ok {
+			// The texture painter composites directly into an *image.RGBA.
+			// Other image types keep the solid fill fallback.
+			return gc.painter
+		}
+		if _, ok := gc.painter.(*raster.RGBAPainter); !ok {
+			// A custom painter was installed (NewGraphicContextWithPainter);
+			// bypassing it for textures would silently drop its behavior.
+			return gc.painter
+		}
+		if p := newTexturePainter(img, gc.Current.FillTexture, gc.Current.Tr, stddraw.Over); p != nil {
+			return p
+		}
+	}
+	return gc.painter
+}
+
+// paintFill rasterizes the fill with either the texture brush or the solid
+// fill color.
+func (gc *GraphicContext) paintFill(rasterizer *raster.Rasterizer) {
+	painter := gc.fillPainter()
+	if painter == gc.painter {
+		gc.painter.SetColor(gc.Current.FillColor)
+	}
+	rasterizer.Rasterize(painter)
+	rasterizer.Clear()
+	gc.Current.Path.Clear()
+}
+
 // Stroke strokes the paths with the color specified by SetStrokeColor
 func (gc *GraphicContext) Stroke(paths ...*draw2d.Path) {
 	paths = append(paths, gc.Current.Path)
@@ -339,7 +375,7 @@ func (gc *GraphicContext) Fill(paths ...*draw2d.Path) {
 		draw2dbase.Flatten(p, flattener, gc.Current.Tr.GetScale())
 	}
 
-	gc.paint(gc.fillRasterizer, gc.Current.FillColor)
+	gc.paintFill(gc.fillRasterizer)
 }
 
 // FillStroke first fills the paths and than strokes them
@@ -366,7 +402,7 @@ func (gc *GraphicContext) FillStroke(paths ...*draw2d.Path) {
 	}
 
 	// Fill
-	gc.paint(gc.fillRasterizer, gc.Current.FillColor)
+	gc.paintFill(gc.fillRasterizer)
 	// Stroke
 	gc.paint(gc.strokeRasterizer, gc.Current.StrokeColor)
 }

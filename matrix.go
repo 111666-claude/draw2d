@@ -138,6 +138,17 @@ func (tr Matrix) Copy() Matrix {
 	return result
 }
 
+// IsFinite reports whether every element of the matrix is a finite number.
+// It is false for a matrix containing NaN or an infinity.
+func (tr Matrix) IsFinite() bool {
+	for _, v := range tr {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return false
+		}
+	}
+	return true
+}
+
 // Compose multiplies trToConcat x tr
 func (tr *Matrix) Compose(trToCompose Matrix) {
 	tr0, tr1, tr2, tr3, tr4, tr5 := tr[0], tr[1], tr[2], tr[3], tr[4], tr[5]

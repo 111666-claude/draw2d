@@ -30,8 +30,17 @@ type GraphicContext interface {
 	Scale(sx, sy float64)
 	// SetStrokeColor sets the current stroke color
 	SetStrokeColor(c color.Color)
-	// SetFillColor sets the current fill color
+	// SetFillColor sets the current fill color and disables any fill texture
 	SetFillColor(c color.Color)
+	// SetFillImageTexture sets the current fill brush to an image texture.
+	// Passing nil restores the solid fill color set with SetFillColor.
+	//
+	// The image and SVG backends implement the brush. Backends that have no
+	// texture support (pdf, OpenGL) keep filling with the solid fill color
+	// when the texture cannot be represented. A texture that is not usable
+	// (nil or empty image, non-finite or singular transform, unknown repeat
+	// policy) is ignored and the solid fill color is used.
+	SetFillImageTexture(t *ImageTexture)
 	// SetFillRule sets the current fill rule
 	SetFillRule(f FillRule)
 	// SetLineWidth sets the current line width

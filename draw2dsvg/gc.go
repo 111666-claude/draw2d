@@ -51,6 +51,13 @@ func (gc *GraphicContext) Clear() {
 	gc.svg.Groups = nil
 }
 
+// SetFillImageTexture sets the fill brush to an image texture. It is emitted as
+// a <pattern> definition containing a single <image> element. Passing nil
+// restores the solid fill color.
+func (gc *GraphicContext) SetFillImageTexture(t *draw2d.ImageTexture) {
+	gc.StackGraphicContext.SetFillImageTexture(t)
+}
+
 // Stroke strokes the paths with the color specified by SetStrokeColor
 func (gc *GraphicContext) Stroke(paths ...*draw2d.Path) {
 	gc.drawPaths(stroked, paths...)
@@ -290,7 +297,12 @@ func (gc *GraphicContext) newGroup(drawType drawType) *Group {
 	}
 
 	if drawType&filled == filled {
-		group.Fill = toSvgRGBA(gc.Current.FillColor)
+		texture := gc.Current.FillTexture
+		if texture.Usable() && gc.Current.Tr.IsFinite() {
+			group.Fill = "url(#" + gc.newPattern(texture).Id + ")"
+		} else {
+			group.Fill = toSvgRGBA(gc.Current.FillColor)
+		}
 		group.FillRule = toSvgFillRule(gc.Current.FillRule)
 	}
 
@@ -300,6 +312,117 @@ func (gc *GraphicContext) newGroup(drawType drawType) *Group {
 	gc.svg.Groups = append(gc.svg.Groups, &group)
 
 	return &group
+}
+
+// newPattern appends an SVG <pattern> definition for t and returns it. The
+// tile is expressed in image pixel coordinates; PatternTransform carries the
+// texture's local transform, so the pattern moves, scales and rotates with the
+// same matrix the image backend uses.
+//
+// SVG has no per-axis repeat control, so limits are turned into tile sizes: a
+// repeated axis uses the image extent (giving seamless wrapping through
+// bilinear filtering), while a clamped axis uses a tile large enough, in user
+// space, that it never wraps within a canvas. The area outside the image
+// inside the tile is transparent, matching the sampler.
+func (gc *GraphicContext) newPattern(t *draw2d.ImageTexture) *Pattern {
+	norm := t.Normalize()
+	b := norm.Image.Bounds()
+	local := norm.LocalTransform()
+	width := float64(b.Dx())
+	if !textureRepeatsX(norm.Repeat) {
+		width = textureClampTileExtent(local, gc.Current.Tr)
+	}
+	height := float64(b.Dy())
+	if !textureRepeatsY(norm.Repeat) {
+		height = textureClampTileExtent(local, gc.Current.Tr)
+	}
+	pattern := &Pattern{
+		X:                float64(b.Min.X),
+		Y:                float64(b.Min.Y),
+		Width:            toSvgLength(width),
+		Height:           toSvgLength(height),
+		PatternUnits:     "userSpaceOnUse",
+		ContentUnits:     "userSpaceOnUse",
+		PatternTransform: toSvgTransform(local),
+		Images: []*Image{{
+			Position:       Position{X: float64(b.Min.X), Y: float64(b.Min.Y)},
+			Dimension:      Dimension{Width: toSvgLength(float64(b.Dx())), Height: toSvgLength(float64(b.Dy()))},
+			Href:           imageToSvgHref(norm.Image),
+			ImageRendering: toSvgImageRendering(norm.Sampling),
+		}},
+	}
+	gc.svg.Patterns = append(gc.svg.Patterns, pattern)
+	pattern.Id = "pattern-" + strconv.Itoa(len(gc.svg.Patterns))
+	return pattern
+}
+
+// textureClampBaseExtent is a generous lower bound on the user-space size of a
+// clamped texture tile. The pattern coordinate system preserves lengths up to
+// the scale of the device transform, so dividing by the largest matrix
+// magnitude keeps the tile at least this large on the canvas even after an
+// aggressive downscale.
+const textureClampBaseExtent = 1 << 20
+
+// textureClampTileExtent returns an image-space tile extent large enough that a
+// clamped axis never repeats within a canvas. The canvas-space length of the
+// tile is the image-space extent times the scale at which the pattern is
+// painted, so the base extent is divided by that scale: shrinking the texture
+// grows the tile in image units and keeps it large on screen. A non-finite or
+// zero scale falls back to the base extent, and the result is capped so the
+// emitted SVG number stays finite.
+func textureClampTileExtent(local, device draw2d.Matrix) float64 {
+	scale := matrixMaxAbs(local) * matrixMaxAbs(device)
+	extent := float64(textureClampBaseExtent)
+	if scale > 0 {
+		extent /= scale
+	}
+	if math.IsNaN(extent) || math.IsInf(extent, 0) {
+		return float64(textureClampBaseExtent)
+	}
+	if extent < 1 {
+		return 1
+	}
+	if extent > textureClampMaxExtent {
+		return textureClampMaxExtent
+	}
+	return extent
+}
+
+// textureClampMaxExtent caps the emitted tile extent so it stays a finite,
+// representable number even for extremely small transforms.
+const textureClampMaxExtent = 1e18
+
+// matrixMaxAbs returns the largest absolute element of m, or 0 when m has no
+// finite element.
+func matrixMaxAbs(m draw2d.Matrix) float64 {
+	max := 0.0
+	for _, v := range m {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			continue
+		}
+		if a := math.Abs(v); a > max {
+			max = a
+		}
+	}
+	return max
+}
+
+func textureRepeatsX(r draw2d.TextureRepeat) bool {
+	return r == draw2d.TextureRepeatX || r == draw2d.TextureRepeatBoth
+}
+
+func textureRepeatsY(r draw2d.TextureRepeat) bool {
+	return r == draw2d.TextureRepeatY || r == draw2d.TextureRepeatBoth
+}
+
+// toSvgImageRendering maps a texture sampling mode to the SVG
+// image-rendering hint. Bilinear uses the default (empty) so renderers apply
+// their normal smoothing; nearest requests pixelated output.
+func toSvgImageRendering(s draw2d.TextureSampling) string {
+	if s == draw2d.TextureSamplingNearest {
+		return "pixelated"
+	}
+	return ""
 }
 
 // creates new mask attached to svg

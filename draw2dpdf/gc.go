@@ -251,6 +251,13 @@ func (gc *GraphicContext) SetStrokeColor(c color.Color) {
 	gc.pdf.SetDrawColor(rgb(c))
 }
 
+// SetFillImageTexture sets the fill brush to an image texture. PDF has no
+// image pattern support in this backend, so the brush is recorded for stack
+// consistency but fills keep using the solid fill color.
+func (gc *GraphicContext) SetFillImageTexture(t *draw2d.ImageTexture) {
+	gc.StackGraphicContext.SetFillImageTexture(t)
+}
+
 // SetFillColor sets the fill and text color
 func (gc *GraphicContext) SetFillColor(c color.Color) {
 	gc.StackGraphicContext.SetFillColor(c)

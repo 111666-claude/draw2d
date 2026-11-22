@@ -15,6 +15,7 @@ import (
 	"github.com/llgcode/draw2d/samples/line"
 	"github.com/llgcode/draw2d/samples/linecapjoin"
 	"github.com/llgcode/draw2d/samples/postscript"
+	"github.com/llgcode/draw2d/samples/texture"
 )
 
 func TestSampleAndroid(t *testing.T) {
@@ -57,4 +58,8 @@ func TestSampleLineCapJoin(t *testing.T) {
 
 func TestSamplePostscript(t *testing.T) {
 	test(t, postscript.Main)
+}
+
+func TestSampleTexture(t *testing.T) {
+	test(t, texture.Main)
 }

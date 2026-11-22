@@ -27,6 +27,9 @@ type ContextStack struct {
 	DashOffset  float64
 	StrokeColor color.Color
 	FillColor   color.Color
+	// FillTexture is the image texture brush installed with
+	// SetFillImageTexture. It is nil when the solid FillColor is used.
+	FillTexture *draw2d.ImageTexture
 	FillRule    draw2d.FillRule
 	Cap         draw2d.LineCap
 	Join        draw2d.LineJoin
@@ -97,6 +100,13 @@ func (gc *StackGraphicContext) SetStrokeColor(c color.Color) {
 
 func (gc *StackGraphicContext) SetFillColor(c color.Color) {
 	gc.Current.FillColor = c
+	gc.Current.FillTexture = nil
+}
+
+// SetFillImageTexture sets the fill brush to an image texture. nil restores
+// the solid fill color.
+func (gc *StackGraphicContext) SetFillImageTexture(t *draw2d.ImageTexture) {
+	gc.Current.FillTexture = t.Normalize()
 }
 
 func (gc *StackGraphicContext) SetFillRule(f draw2d.FillRule) {
@@ -183,6 +193,7 @@ func (gc *StackGraphicContext) Save() {
 	context.LineWidth = gc.Current.LineWidth
 	context.StrokeColor = gc.Current.StrokeColor
 	context.FillColor = gc.Current.FillColor
+	context.FillTexture = gc.Current.FillTexture.Normalize()
 	context.FillRule = gc.Current.FillRule
 	context.Dash = gc.Current.Dash
 	context.DashOffset = gc.Current.DashOffset

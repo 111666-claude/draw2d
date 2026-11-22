@@ -109,6 +109,36 @@ There are more examples here: https://github.com/llgcode/draw2d/tree/master/samp
 
 Drawing on opengl is provided by the draw2dgl package.
 
+Image textures
+--------------
+
+A path can be filled with an image brush instead of a solid color. The brush
+carries a local transform from image pixels to user space and a repeat policy,
+so the texture moves, scales and rotates together with the path. The image and
+SVG backends both implement it, sampling in premultiplied alpha so semi
+transparent edges do not darken.
+
+```go
+tile, _ := draw2dimg.LoadFromPngFile("tile.png")
+gc.SetFillImageTexture(draw2d.NewImageTexture(
+	tile,
+	draw2d.NewScaleMatrix(2, 2), // image pixels -> user space
+	draw2d.TextureRepeatBoth,    // repeat-x, repeat-y, both, or clamp
+))
+gc.MoveTo(0, 0)
+gc.LineTo(200, 0)
+gc.LineTo(200, 120)
+gc.LineTo(0, 120)
+gc.Close()
+gc.Fill()
+```
+
+A texture whose image is nil or empty, whose transform is non-finite or
+singular, or whose repeat policy is invalid is ignored and the solid fill color
+is used. The pdf and opengl backends have no texture support and always keep
+the solid fill. Use `TextureSamplingNearest` for pixel art; it maps to SVG's
+`image-rendering="pixelated"`.
+
 Testing
 -------
 

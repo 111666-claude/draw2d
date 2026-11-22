@@ -107,6 +107,12 @@ func toSvgPathDesc(p *draw2d.Path) string {
 }
 
 func toSvgTransform(mat draw2d.Matrix) string {
+	if !mat.IsFinite() {
+		// A non-finite matrix cannot be represented in SVG. Emitting the
+		// identity keeps the document valid instead of producing
+		// matrix(NaN,...).
+		return ""
+	}
 	if mat.IsIdentity() {
 		return ""
 	}
