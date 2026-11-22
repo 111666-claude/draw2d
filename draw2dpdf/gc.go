@@ -1,6 +1,5 @@
 // Copyright 2015 The draw2d Authors. All rights reserved.
 // created: 26/06/2015 by Stani Michiels
-// TODO: dashed line
 
 package draw2dpdf
 
@@ -290,7 +289,7 @@ func (gc *GraphicContext) SetFontData(fontData draw2d.FontData) {
 	gc.pdf.SetFont(fontData.Name, style, size)
 }
 
-// SetFontSize sets the font size in points (as in ``a 12 point font'').
+// SetFontSize sets the font size in points (as in ``a 12 point font).
 // TODO: resolve this with ImgGraphicContext (now done with gc.Current.Scale)
 func (gc *GraphicContext) SetFontSize(fontSize float64) {
 	gc.StackGraphicContext.SetFontSize(fontSize)
@@ -298,10 +297,33 @@ func (gc *GraphicContext) SetFontSize(fontSize float64) {
 	gc.pdf.SetFontSize(fontSize * gc.Current.Scale)
 }
 
-// SetLineDash sets the line dash pattern
+// applyLineDash normalizes the dash pattern and pushes it to the pdf
+// document. Invalid input is reported through the document's error state
+// instead of reaching gofpdf, which would emit an invalid or looping
+// pattern. See normalizeDash for the normalization rules.
+func (gc *GraphicContext) applyLineDash(Dash []float64, DashOffset float64) {
+	pattern, offset, dashed, err := normalizeDash(Dash, DashOffset)
+	if err != nil {
+		gc.pdf.SetError(err)
+		// fall back to a solid line so the document stays renderable
+		gc.pdf.SetDashPattern([]float64{}, 0)
+		return
+	}
+	if !dashed {
+		// an empty array restores solid line drawing
+		gc.pdf.SetDashPattern([]float64{}, 0)
+		return
+	}
+	gc.pdf.SetDashPattern(pattern, offset)
+}
+
+// SetLineDash sets the line dash pattern. The length sequence and the
+// offset are normalized before being written to the pdf: odd sequences
+// are duplicated, zero entries dropped, non-finite or negative entries
+// rejected and the offset is reduced to a positive phase.
 func (gc *GraphicContext) SetLineDash(Dash []float64, DashOffset float64) {
 	gc.StackGraphicContext.SetLineDash(Dash, DashOffset)
-	gc.pdf.SetDashPattern(Dash, DashOffset)
+	gc.applyLineDash(Dash, DashOffset)
 }
 
 // SetLineWidth sets the line width
@@ -371,7 +393,7 @@ func (gc *GraphicContext) Restore() {
 	gc.SetStrokeColor(c.StrokeColor)
 	gc.SetFillColor(c.FillColor)
 	gc.SetFillRule(c.FillRule)
-	// gc.SetLineDash(c.Dash, c.DashOffset) // TODO
+	gc.SetLineDash(c.Dash, c.DashOffset)
 	gc.SetLineCap(c.Cap)
 	gc.SetLineJoin(c.Join)
 	// c.Path unsupported
