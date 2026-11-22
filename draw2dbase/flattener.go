@@ -27,8 +27,18 @@ type Flattener interface {
 	End()
 }
 
+// CurveFlatteningThreshold is the default tolerance used to subdivide
+// Bézier curves into straight line segments.
+const CurveFlatteningThreshold = 0.5
+
 // Flatten convert curves into straight segments keeping join segments info
 func Flatten(path *draw2d.Path, flattener Flattener, scale float64) {
+	flatten(path, flattener, scale, CurveFlatteningThreshold)
+}
+
+// flatten is the internal implementation of Flatten with an explicit
+// curve flattening tolerance.
+func flatten(path *draw2d.Path, flattener Flattener, scale, tolerance float64) {
 	// First Point
 	var startX, startY float64 = 0, 0
 	// Current Point
@@ -50,12 +60,12 @@ func Flatten(path *draw2d.Path, flattener Flattener, scale float64) {
 			flattener.LineJoin()
 			i += 2
 		case draw2d.QuadCurveToCmp:
-			TraceQuad(flattener, path.Points[i-2:], 0.5)
+			TraceQuad(flattener, path.Points[i-2:], tolerance)
 			x, y = path.Points[i+2], path.Points[i+3]
 			flattener.LineTo(x, y)
 			i += 4
 		case draw2d.CubicCurveToCmp:
-			TraceCubic(flattener, path.Points[i-2:], 0.5)
+			TraceCubic(flattener, path.Points[i-2:], tolerance)
 			x, y = path.Points[i+4], path.Points[i+5]
 			flattener.LineTo(x, y)
 			i += 6

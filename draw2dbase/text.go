@@ -13,11 +13,10 @@ type GlyphCacheImp struct {
 	glyphs map[string]map[rune]*Glyph
 }
 
-
 // NewGlyphCache initializes a GlyphCache
 func NewGlyphCache() *GlyphCacheImp {
 	glyphs := make(map[string]map[rune]*Glyph)
-	return &GlyphCacheImp {
+	return &GlyphCacheImp{
 		glyphs: glyphs,
 	}
 }

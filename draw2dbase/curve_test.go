@@ -8,6 +8,7 @@ import (
 	"image/draw"
 	"image/png"
 	"log"
+	"math"
 	"os"
 	"testing"
 )
@@ -173,4 +174,25 @@ func TestOutOfRangeTraceQuad(t *testing.T) {
 	}
 	var p SegmentedPath
 	TraceQuad(&p, c, flatteningThreshold)
+}
+
+// TestTraceNonFiniteTerminates checks that degenerate inputs cannot make
+// the curve tracers loop forever (they used to subdivide or step by a zero
+// angular increment without terminating).
+func TestTraceNonFiniteTerminates(t *testing.T) {
+	var p SegmentedPath
+	TraceCubic(&p, []float64{0, 0, math.NaN(), 1, 2, 3, 4, 5}, flatteningThreshold)
+	TraceCubic(&p, []float64{0, 0, math.Inf(1), 1, 2, 3, 4, 5}, flatteningThreshold)
+	TraceCubic(&p, []float64{0, 0, 1, 2, 3, 4, 5, math.Inf(-1)}, flatteningThreshold)
+	TraceQuad(&p, []float64{0, 0, math.NaN(), 1, 2, 3}, flatteningThreshold)
+	TraceQuad(&p, []float64{0, 0, 1, 2, 3, math.Inf(1)}, flatteningThreshold)
+	// degenerate scales
+	TraceArc(&p, 0, 0, 10, 10, 0, math.Pi, math.Inf(1))
+	TraceArc(&p, 0, 0, 10, 10, 0, math.Pi, math.NaN())
+	TraceArc(&p, 0, 0, 10, 10, 0, -math.Pi, math.Inf(-1))
+	// non-finite arc geometry
+	TraceArc(&p, math.NaN(), 0, 10, 10, 0, math.Pi, 1)
+	TraceArc(&p, 0, 0, math.Inf(1), 10, 0, math.Pi, 1)
+	// absurd sweep angle terminates via the segment cap
+	TraceArc(&p, 0, 0, 10, 10, 0, 1e300, 1)
 }

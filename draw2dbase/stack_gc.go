@@ -47,7 +47,6 @@ func (cs *ContextStack) GetFontName() string {
 	return fmt.Sprintf("%s:%d:%d:%9.2f", fontData.Name, fontData.Family, fontData.Style, cs.FontSize)
 }
 
-
 /**
  * Create a new Graphic context from an image
  */

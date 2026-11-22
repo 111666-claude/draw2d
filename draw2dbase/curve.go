@@ -54,6 +54,13 @@ func TraceCubic(t Liner, cubic []float64, flatteningThreshold float64) error {
 	if len(cubic) < 8 {
 		return errors.New("cubic length must be >= 8")
 	}
+	if !allFinite(cubic[:8]) {
+		// Non-finite coordinates can never satisfy the flatness criterion
+		// and would be subdivided forever; emit a single line to the end
+		// point instead.
+		t.LineTo(cubic[6], cubic[7])
+		return nil
+	}
 	// Allocation curves
 	var curves [CurveRecursionLimit * 8]float64
 	copy(curves[0:8], cubic[0:8])
@@ -114,6 +121,11 @@ func TraceQuad(t Liner, quad []float64, flatteningThreshold float64) error {
 	if len(quad) < 6 {
 		return errors.New("quad length must be >= 6")
 	}
+	if !allFinite(quad[:6]) {
+		// See TraceCubic.
+		t.LineTo(quad[4], quad[5])
+		return nil
+	}
 	// Allocates curves stack
 	var curves [CurveRecursionLimit * 6]float64
 	copy(curves[0:6], quad[0:6])
@@ -142,23 +154,39 @@ func TraceQuad(t Liner, quad []float64, flatteningThreshold float64) error {
 	return nil
 }
 
+// maxArcSegments bounds the number of segments a single arc is flattened
+// into, so that an absurd sweep angle terminates deterministically.
+const maxArcSegments = 1 << 16
+
 // TraceArc trace an arc using a Liner
 func TraceArc(t Liner, x, y, rx, ry, start, angle, scale float64) (lastX, lastY float64) {
 	end := start + angle
+	if !isFinite(x) || !isFinite(y) || !isFinite(rx) || !isFinite(ry) || !isFinite(start) || !isFinite(angle) {
+		// Non-finite arc geometry cannot be traced; report the (possibly
+		// non-finite) end point without emitting segments.
+		return x + math.Cos(end)*rx, y + math.Sin(end)*ry
+	}
 	clockWise := true
 	if angle < 0 {
 		clockWise = false
 	}
 	ra := (math.Abs(rx) + math.Abs(ry)) / 2
 	da := math.Acos(ra/(ra+0.125/scale)) * 2
+	if math.IsNaN(da) || da <= 0 {
+		// Degenerate scale (zero, negative, infinite or NaN) would produce a
+		// zero or NaN angular step and loop forever; fall back to a fixed
+		// one degree step so flattening always terminates.
+		da = math.Pi / 180
+	}
 	//normalize
 	if !clockWise {
 		da = -da
 	}
 	angle = start + da
 	var curX, curY float64
+	segments := 0
 	for {
-		if (angle < end-da/4) != clockWise {
+		if (angle < end-da/4) != clockWise || segments >= maxArcSegments {
 			curX = x + math.Cos(end)*rx
 			curY = y + math.Sin(end)*ry
 			return curX, curY
@@ -167,6 +195,7 @@ func TraceArc(t Liner, x, y, rx, ry, start, angle, scale float64) (lastX, lastY 
 		curY = y + math.Sin(angle)*ry
 
 		angle += da
+		segments++
 		t.LineTo(curX, curY)
 	}
 }

@@ -322,7 +322,7 @@ func (gc *GraphicContext) Stroke(paths ...*draw2d.Path) {
 		liner = stroker
 	}
 	for _, p := range paths {
-		draw2dbase.Flatten(p, liner, gc.Current.Tr.GetScale())
+		draw2dbase.FlattenCached(p, liner, gc.Current.Tr.GetScale(), draw2dbase.StrokePurpose)
 	}
 
 	gc.paint(gc.strokeRasterizer, gc.Current.StrokeColor)
@@ -336,7 +336,7 @@ func (gc *GraphicContext) Fill(paths ...*draw2d.Path) {
 	/**** first method ****/
 	flattener := draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: FtLineBuilder{Adder: gc.fillRasterizer}}
 	for _, p := range paths {
-		draw2dbase.Flatten(p, flattener, gc.Current.Tr.GetScale())
+		draw2dbase.FlattenCached(p, flattener, gc.Current.Tr.GetScale(), draw2dbase.FillPurpose)
 	}
 
 	gc.paint(gc.fillRasterizer, gc.Current.FillColor)
@@ -362,7 +362,7 @@ func (gc *GraphicContext) FillStroke(paths ...*draw2d.Path) {
 
 	demux := draw2dbase.DemuxFlattener{Flatteners: []draw2dbase.Flattener{flattener, liner}}
 	for _, p := range paths {
-		draw2dbase.Flatten(p, demux, gc.Current.Tr.GetScale())
+		draw2dbase.FlattenCached(p, demux, gc.Current.Tr.GetScale(), draw2dbase.FillStrokePurpose)
 	}
 
 	// Fill
