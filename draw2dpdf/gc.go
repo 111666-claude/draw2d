@@ -8,11 +8,10 @@ import (
 	"bytes"
 	"image"
 	"image/color"
-	"image/png"
 	"log"
 	"math"
 	"os"
-	"strconv"
+	"sync"
 
 	"github.com/golang/freetype/truetype"
 
@@ -38,8 +37,7 @@ var (
 		draw2d.BevelJoin: "bevel",
 		draw2d.MiterJoin: "miter",
 	}
-	imageCount uint32
-	white      color.Color = color.RGBA{255, 255, 255, 255}
+	white color.Color = color.RGBA{255, 255, 255, 255}
 )
 
 // NewPdf creates a new pdf document with the draw2d fontfolder, adds
@@ -83,28 +81,53 @@ type GraphicContext struct {
 	*draw2dbase.StackGraphicContext
 	pdf *gofpdf.Fpdf
 	DPI int
+	// images deduplicates image resources across pages, so that drawing
+	// the same image repeatedly does not inflate the pdf. imu serializes
+	// image registration and placement, keeping the pdf's internal image
+	// table consistent under concurrent DrawImage calls.
+	images *imageCache
+	imu    sync.Mutex
 }
 
 // NewGraphicContext creates a new pdf GraphicContext
 func NewGraphicContext(pdf *gofpdf.Fpdf) *GraphicContext {
-	gc := &GraphicContext{draw2dbase.NewStackGraphicContext(), pdf, DPI}
+	gc := &GraphicContext{
+		StackGraphicContext: draw2dbase.NewStackGraphicContext(),
+		pdf:                 pdf,
+		DPI:                 DPI,
+		images:              newImageCache(DefaultImageCacheLimit),
+	}
 	gc.SetDPI(DPI)
 	return gc
 }
 
-// DrawImage draws an image as PNG
-// TODO: add type (tp) as parameter to argument list?
+// DrawImage draws an image as PNG. Identical images (same pixels, bounds
+// and encoding) share a single pdf image resource, no matter on which
+// page or how often they are drawn; each placement still applies the
+// current transformation, clipping and alpha.
 func (gc *GraphicContext) DrawImage(image image.Image) {
-	name := strconv.Itoa(int(imageCount))
-	imageCount++
-	tp := "PNG" // "JPG", "JPEG", "PNG" and "GIF"
-	b := &bytes.Buffer{}
-	png.Encode(b, image)
-	gc.pdf.RegisterImageReader(name, tp, b)
+	name, data, err := gc.images.register(image)
+	if err != nil {
+		logger.Printf("DrawImage skipped: %v", err)
+		return
+	}
+	gc.imu.Lock()
+	defer gc.imu.Unlock()
+	if data != nil {
+		gc.pdf.RegisterImageReader(name, imageTypePNG, bytes.NewReader(data))
+	}
 	bounds := image.Bounds()
 	x0, y0 := float64(bounds.Min.X), float64(bounds.Min.Y)
 	w, h := float64(bounds.Dx()), float64(bounds.Dy())
-	gc.pdf.Image(name, x0, y0, w, h, false, tp, 0, "")
+	gc.pdf.Image(name, x0, y0, w, h, false, imageTypePNG, 0, "")
+}
+
+// CloseImageCache releases the deduplicated image resource table of this
+// context. It is idempotent and safe to call concurrently with DrawImage;
+// images drawn afterwards are still placed correctly, but registered
+// under unique names without deduplication.
+func (gc *GraphicContext) CloseImageCache() {
+	gc.images.close()
 }
 
 // Clear draws a white rectangle over the whole page
