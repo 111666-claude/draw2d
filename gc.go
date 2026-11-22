@@ -6,6 +6,8 @@ package draw2d
 import (
 	"image"
 	"image/color"
+
+	"golang.org/x/image/draw"
 )
 
 // GraphicContext describes the interface for the various backends (images, pdf, opengl, ...)
@@ -54,6 +56,17 @@ type GraphicContext interface {
 	GetFontName() string
 	// DrawImage draws the raster image in the current canvas
 	DrawImage(image image.Image)
+	// DrawImageRect draws the part of src defined by srcRect (in source
+	// pixel coordinates) into dstRect (in user coordinates, transformed by
+	// the current matrix), scaling the source region so that it fills the
+	// destination rectangle. filter selects the interpolation used when
+	// scaling and op the Porter-Duff compositing operator. Unlike
+	// DrawImage, which draws the whole image at its bounds, DrawImageRect
+	// can draw a single cell of a sprite sheet into an arbitrary
+	// rectangle. It returns a non-nil error (and draws nothing) for
+	// invalid geometry or transformation; a zero-sized destination or a
+	// singular transformation is a no-op with a nil error.
+	DrawImageRect(src image.Image, srcRect image.Rectangle, dstRect image.Rectangle, filter Filter, op draw.Op) error
 	// Save the context and push it to the context stack
 	Save()
 	// Restore remove the current context and restore the last one

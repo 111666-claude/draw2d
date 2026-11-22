@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"image"
 	"image/color"
+	stddraw "image/draw"
 	"image/png"
 	"log"
 	"math"
@@ -20,6 +21,7 @@ import (
 	"github.com/llgcode/draw2d"
 	"github.com/llgcode/draw2d/draw2dbase"
 	"github.com/llgcode/draw2d/draw2dkit"
+	xdraw "golang.org/x/image/draw"
 )
 
 const (
@@ -105,6 +107,42 @@ func (gc *GraphicContext) DrawImage(image image.Image) {
 	x0, y0 := float64(bounds.Min.X), float64(bounds.Min.Y)
 	w, h := float64(bounds.Dx()), float64(bounds.Dy())
 	gc.pdf.Image(name, x0, y0, w, h, false, tp, 0, "")
+}
+
+// DrawImageRect draws the part of src defined by srcRect (in source pixel
+// coordinates), scaled so that srcRect fills dstRect. The source region is
+// cropped to a new image which is placed at the matching sub-rectangle of
+// dstRect. The filter and op parameters are ignored: PDF image XObjects
+// are always composited over and scaled by the viewer.
+func (gc *GraphicContext) DrawImageRect(src image.Image, srcRect, dstRect image.Rectangle, filter draw2d.Filter, op xdraw.Op) error {
+	if src == nil {
+		return draw2d.ErrNilImage
+	}
+	_, sr, err := draw2d.ImageRectMatrix(src.Bounds(), srcRect, dstRect, gc.Current.Tr)
+	if err != nil {
+		return err
+	}
+	if sr.Empty() {
+		return nil
+	}
+	cropped := image.NewRGBA(image.Rect(0, 0, sr.Dx(), sr.Dy()))
+	stddraw.Draw(cropped, cropped.Bounds(), src, sr.Min, stddraw.Src)
+
+	name := strconv.Itoa(int(imageCount))
+	imageCount++
+	tp := "PNG"
+	b := &bytes.Buffer{}
+	png.Encode(b, cropped)
+	gc.pdf.RegisterImageReader(name, tp, b)
+
+	// Place the clipped source region at the matching sub-rectangle of
+	// dstRect, i.e. apply the linear map from srcRect to dstRect to sr.
+	sx := float64(dstRect.Dx()) / float64(srcRect.Dx())
+	sy := float64(dstRect.Dy()) / float64(srcRect.Dy())
+	x := float64(dstRect.Min.X) + float64(sr.Min.X-srcRect.Min.X)*sx
+	y := float64(dstRect.Min.Y) + float64(sr.Min.Y-srcRect.Min.Y)*sy
+	gc.pdf.Image(name, x, y, float64(sr.Dx())*sx, float64(sr.Dy())*sy, false, tp, 0, "")
+	return nil
 }
 
 // Clear draws a white rectangle over the whole page

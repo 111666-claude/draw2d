@@ -15,6 +15,7 @@ import (
 	"github.com/llgcode/draw2d/draw2dbase"
 	"github.com/llgcode/draw2d/draw2dimg"
 
+	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 )
@@ -330,6 +331,11 @@ func (gc *GraphicContext) ClearRect(x1, y1, x2, y2 int) {
 
 //TODO
 func (gc *GraphicContext) DrawImage(img image.Image) {
+	panic("not implemented")
+}
+
+//TODO
+func (gc *GraphicContext) DrawImageRect(src image.Image, srcRect, dstRect image.Rectangle, filter draw2d.Filter, op xdraw.Op) error {
 	panic("not implemented")
 }
 

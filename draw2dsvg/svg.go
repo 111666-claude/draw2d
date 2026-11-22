@@ -55,12 +55,13 @@ func NewSvg() *Svg {
 
 type Group struct {
 	FillStroke
-	Transform string   `xml:"transform,attr,omitempty"`
-	Groups    []*Group `xml:"g"`
-	Paths     []*Path  `xml:"path"`
-	Texts     []*Text  `xml:"text"`
-	Image     *Image   `xml:"image"`
-	Mask      string   `xml:"mask,attr,omitempty"`
+	Transform string      `xml:"transform,attr,omitempty"`
+	Groups    []*Group    `xml:"g"`
+	Paths     []*Path     `xml:"path"`
+	Texts     []*Text     `xml:"text"`
+	Image     *Image      `xml:"image"`
+	Viewports []*Viewport `xml:"svg"`
+	Mask      string      `xml:"mask,attr,omitempty"`
 }
 
 type Path struct {
@@ -81,6 +82,19 @@ type Image struct {
 	Position
 	Dimension
 	Href string `xml:"href,attr"`
+}
+
+// Viewport is a nested svg element that establishes a new viewport with its
+// own viewBox. It is used to draw a clipped and scaled rectangular region
+// of an image into a destination rectangle: the viewBox selects the source
+// region of the embedded image and the viewport rectangle defines where
+// and how large it is rendered. Content outside the viewport is clipped.
+type Viewport struct {
+	Position
+	Dimension
+	ViewBox             string `xml:"viewBox,attr"`
+	PreserveAspectRatio string `xml:"preserveAspectRatio,attr"`
+	Image               *Image `xml:"image"`
 }
 
 type Mask struct {

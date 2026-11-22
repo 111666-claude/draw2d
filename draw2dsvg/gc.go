@@ -7,6 +7,7 @@ import (
 		"github.com/golang/freetype/truetype"
 	"github.com/llgcode/draw2d"
 	"github.com/llgcode/draw2d/draw2dbase"
+	"golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"image"
@@ -131,6 +132,49 @@ func (gc *GraphicContext) DrawImage(image image.Image) {
 	svgImage.Width = toSvgLength(float64(bounds.Max.X - bounds.Min.X))
 	svgImage.Height = toSvgLength(float64(bounds.Max.Y - bounds.Min.Y))
 	gc.newGroup(0).Image = svgImage
+}
+
+// DrawImageRect draws the part of the image defined by srcRect (in source
+// pixel coordinates) into dstRect (in user coordinates, transformed by the
+// current matrix). It emits a nested <svg> viewport whose viewBox selects
+// the source region of the embedded image, which both clips and scales it
+// onto the destination rectangle. The filter and op parameters are accepted
+// for interface compatibility: SVG rendering is resolution independent and
+// always composites over.
+func (gc *GraphicContext) DrawImageRect(img image.Image, srcRect, dstRect image.Rectangle, filter draw2d.Filter, op draw.Op) error {
+	if img == nil {
+		return draw2d.ErrNilImage
+	}
+	bounds := img.Bounds()
+	_, sr, err := draw2d.ImageRectMatrix(bounds, srcRect, dstRect, gc.Current.Tr)
+	if err != nil {
+		return err
+	}
+	if sr.Empty() {
+		return nil
+	}
+
+	svgImage := &Image{Href: imageToSvgHref(img)}
+	svgImage.X = float64(bounds.Min.X)
+	svgImage.Y = float64(bounds.Min.Y)
+	svgImage.Width = toSvgLength(float64(bounds.Dx()))
+	svgImage.Height = toSvgLength(float64(bounds.Dy()))
+
+	viewport := &Viewport{
+		ViewBox: optiSprintf("%f %f %f %f",
+			float64(srcRect.Min.X), float64(srcRect.Min.Y),
+			float64(srcRect.Dx()), float64(srcRect.Dy())),
+		PreserveAspectRatio: "none",
+		Image:               svgImage,
+	}
+	viewport.X = float64(dstRect.Min.X)
+	viewport.Y = float64(dstRect.Min.Y)
+	viewport.Width = toSvgLength(float64(dstRect.Dx()))
+	viewport.Height = toSvgLength(float64(dstRect.Dy()))
+
+	group := gc.newGroup(0)
+	group.Viewports = append(group.Viewports, viewport)
+	return nil
 }
 
 // ClearRect fills the specified rectangle with a default transparent color

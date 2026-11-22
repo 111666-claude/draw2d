@@ -121,6 +121,81 @@ func (gc *GraphicContext) DrawImage(img image.Image) {
 	DrawImage(img, gc.img, gc.Current.Tr, draw.Over, gc.Filter)
 }
 
+// toAffine converts m to the f64.Aff3 layout used by golang.org/x/image/draw.
+func toAffine(m draw2d.Matrix) f64.Aff3 {
+	return f64.Aff3{m[0], m[2], m[4], m[1], m[3], m[5]}
+}
+
+// transformerFor returns the golang.org/x/image/draw transformer
+// implementing the given filter, defaulting to bilinear interpolation.
+func transformerFor(filter draw2d.Filter) draw.Transformer {
+	switch filter {
+	case draw2d.FilterNearest:
+		return draw.NearestNeighbor
+	case draw2d.FilterLinear:
+		return draw.BiLinear
+	case draw2d.FilterBicubic:
+		return draw.CatmullRom
+	}
+	return draw.BiLinear
+}
+
+// Filter converts f to the equivalent draw2d.Filter for use with
+// DrawImageRect.
+func (f ImageFilter) Filter() draw2d.Filter {
+	switch f {
+	case LinearFilter:
+		return draw2d.FilterNearest
+	case BilinearFilter:
+		return draw2d.FilterLinear
+	case BicubicFilter:
+		return draw2d.FilterBicubic
+	}
+	return draw2d.FilterLinear
+}
+
+// DrawImageRect draws the part of src defined by srcRect into dest, scaling
+// it so that srcRect fills dstRect (in user coordinates) composed with the
+// transformation tr, using the given compositing op and interpolation
+// filter. A source rectangle extending beyond the source bounds is clipped.
+// It returns a non-nil error (and draws nothing) for invalid geometry or a
+// non-finite tr; a zero-sized dstRect or a singular tr is a no-op with a
+// nil error.
+func DrawImageRect(src image.Image, dest draw.Image, srcRect, dstRect image.Rectangle, tr draw2d.Matrix, op draw.Op, filter draw2d.Filter) error {
+	if src == nil {
+		return draw2d.ErrNilImage
+	}
+	m, sr, err := draw2d.ImageRectMatrix(src.Bounds(), srcRect, dstRect, tr)
+	if err != nil {
+		return err
+	}
+	if sr.Empty() {
+		return nil
+	}
+	// Pure integer translations are copied directly: besides being faster,
+	// this avoids the broken copy fast path of the pinned
+	// golang.org/x/image version, which misplaces the destination when
+	// sr.Min.X != sr.Min.Y.
+	if m[0] == 1 && m[1] == 0 && m[2] == 0 && m[3] == 1 &&
+		math.Abs(m[4]) <= 1<<30 && math.Abs(m[5]) <= 1<<30 {
+		tx, ty := m[4], m[5]
+		itx, ity := int(tx), int(ty)
+		if float64(itx) == tx && float64(ity) == ty {
+			draw.Draw(dest, sr.Add(image.Pt(itx, ity)), src, sr.Min, op)
+			return nil
+		}
+	}
+	transformerFor(filter).Transform(dest, toAffine(m), src, sr, op, nil)
+	return nil
+}
+
+// DrawImageRect draws the part of img defined by srcRect (in source pixel
+// coordinates) into dstRect (in user coordinates, transformed by the
+// current matrix), using the given interpolation filter and compositing op.
+func (gc *GraphicContext) DrawImageRect(img image.Image, srcRect, dstRect image.Rectangle, filter draw2d.Filter, op draw.Op) error {
+	return DrawImageRect(img, gc.img, srcRect, dstRect, gc.Current.Tr, op, filter)
+}
+
 // FillString draws the text at point (0, 0)
 func (gc *GraphicContext) FillString(text string) (width float64) {
 	return gc.FillStringAt(text, 0, 0)
