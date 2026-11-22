@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="297" height="210" fill="none" stroke="none">
+	<defs></defs>
+	<g fill="rgba(224,48,48,0.69)" fill-rule="evenodd">
+		<path d="M 40,40 L 140,40 L 140,120 L 40,120 Z "></path>
+	</g>
+	<g fill="rgba(48,48,224,0.69)" fill-rule="evenodd">
+		<path d="M 90,70 L 190,70 L 190,150 L 90,150 Z "></path>
+	</g>
+</svg>

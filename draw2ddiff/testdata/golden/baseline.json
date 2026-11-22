@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "entries": {
+    "alpha/pdf": {
+      "hash": "52574fbf3f0547ca574bc94382d20c660c1019b8369eb31ec13fc3d97a7c0742",
+      "counts": {
+        "closepath": 2,
+        "fill": 1,
+        "lineto": 8,
+        "moveto": 2,
+        "stroke": 1
+      }
+    },
+    "alpha/png": {
+      "hash": "432bc5e42cf374f025681dccac35de2f961c7283e1c719a4356119ee0f14b581",
+      "width": 297,
+      "height": 210
+    },
+    "alpha/svg": {
+      "hash": "dd3e298f401d436d683bcc6287d8f176fb6203ae1e6c18d806e9ee69be3e60ac",
+      "counts": {
+        "font": 0,
+        "g": 2,
+        "mask": 0,
+        "path": 2,
+        "text": 0
+      }
+    },
+    "empty/pdf": {
+      "hash": "9151794e79cf9cc6a6dd2c4397c300f5d42c5907f30266f00838e803bcb20026"
+    },
+    "empty/png": {
+      "hash": "938384e8a08c2553de13e29d2786a1b442563643e3fff38b21006c76c41cf63f",
+      "width": 297,
+      "height": 210
+    },
+    "empty/svg": {
+      "hash": "8cd7e776b9a4dc4c00105f636b10d7dd53c81376146896b5a24530e6b64c39c9",
+      "counts": {
+        "font": 0,
+        "mask": 0
+      }
+    },
+    "image/pdf": {
+      "hash": "4ea453fe401fca290614e2d045401255e4301a40619d639bb7e2e3f91698e3ca",
+      "counts": {
+        "grestore": 1,
+        "gsave": 1,
+        "image": 1,
+        "matrix": 1
+      }
+    },
+    "image/png": {
+      "hash": "6a2f7298c115d3ce5d2abc654cd8756b66d74204a915dbaa4e3e3ace8bd0f086",
+      "width": 297,
+      "height": 210
+    },
+    "image/svg": {
+      "hash": "af43be3b90e70d651179788b21dfaf2c32b70c5d38d043d6e869d0a7e43f5369",
+      "counts": {
+        "font": 0,
+        "g": 1,
+        "image": 1,
+        "mask": 0,
+        "path": 0,
+        "text": 0
+      }
+    },
+    "missing-glyph/pdf": {
+      "hash": "e591941ba07a8a3dc7bb30e5f685fa88a7e76cab96abb00d51646cf00c1c6142",
+      "counts": {
+        "moveto": 1,
+        "text": 1
+      }
+    },
+    "missing-glyph/png": {
+      "hash": "39f0486874d547f6fb2eb53063e60f6c5925bbbdf86e0dbae84c536a2dcd7e8e",
+      "width": 297,
+      "height": 210
+    },
+    "missing-glyph/svg": {
+      "hash": "4949351d943821806dfc8c7ed7988257093f51fb0fe3195d447248e5945ed588",
+      "counts": {
+        "font": 0,
+        "g": 1,
+        "mask": 0,
+        "path": 1,
+        "text": 0
+      }
+    },
+    "nonfinite/pdf": {
+      "hash": "96fe77aac7e19dd39ef93d20c9ae00134892579a6df627efda9e528a5cb70f90",
+      "counts": {
+        "closepath": 1,
+        "curveto": 1,
+        "fillstroke": 1,
+        "lineto": 3,
+        "moveto": 1
+      }
+    },
+    "nonfinite/png": {
+      "error": "backend png did not terminate on non-finite input within 3s"
+    },
+    "nonfinite/svg": {
+      "hash": "bd834fa57a7ce2b11119ab307010325f4ac4dc863919649095056997fb603c1f",
+      "counts": {
+        "font": 0,
+        "g": 1,
+        "mask": 0,
+        "path": 1,
+        "text": 0
+      }
+    },
+    "nonzero-bounds/pdf": {
+      "hash": "980824384b4c191bb2a0caf1944b6e5870dacf2a83f4cf69a2715cd8e959addd",
+      "counts": {
+        "grestore": 1,
+        "gsave": 1,
+        "image": 1,
+        "lineto": 2,
+        "matrix": 1,
+        "moveto": 1,
+        "stroke": 1
+      }
+    },
+    "nonzero-bounds/png": {
+      "hash": "122e46e2b96e5a3ab6e220b5b668d597896f32d121a689fc41f188aa81930874",
+      "width": 297,
+      "height": 210
+    },
+    "nonzero-bounds/svg": {
+      "hash": "985d7e9ed90eca296637cf7675587aeba914ea4abd0878abbf34ffc68267a974",
+      "counts": {
+        "font": 0,
+        "g": 2,
+        "image": 1,
+        "mask": 0,
+        "path": 1,
+        "text": 0
+      }
+    },
+    "overlap/pdf": {
+      "hash": "b336f56c393670ce139c983145f5d7d14e809f8104a98388df36417d6fe55da2",
+      "counts": {
+        "closepath": 2,
+        "fill": 2,
+        "lineto": 8,
+        "moveto": 2
+      }
+    },
+    "overlap/png": {
+      "hash": "f7a4a571c50b0dd78d502e572bbb5f23c7563e37c6b006135d795467d1936ebf",
+      "width": 297,
+      "height": 210
+    },
+    "overlap/svg": {
+      "hash": "394f1ae51afd1cfe081c484cb80bd56cb5d45d1d72a40cc14c656a258099acb8",
+      "counts": {
+        "font": 0,
+        "g": 2,
+        "mask": 0,
+        "path": 2,
+        "text": 0
+      }
+    },
+    "paths/pdf": {
+      "hash": "62acf04318d401c8f202be2ca20f544e7983dc7bb60b4d10dfdb250b0a8bebe3",
+      "counts": {
+        "closepath": 2,
+        "curveto": 4,
+        "fillstroke": 1,
+        "lineto": 6,
+        "moveto": 2,
+        "stroke": 1
+      }
+    },
+    "paths/png": {
+      "hash": "02040e261503bb4396fac6cb28980e3afcab1f628db149b25b66625b53b80ccd",
+      "width": 297,
+      "height": 210
+    },
+    "paths/svg": {
+      "hash": "aa6e05faf1bdab9d364c55937686ee4b72aaab37f3369804f79d9a6a4f054c45",
+      "counts": {
+        "font": 0,
+        "g": 2,
+        "mask": 0,
+        "path": 2,
+        "text": 0
+      }
+    },
+    "text/pdf": {
+      "hash": "a35c1b432b95b45a01bcbe1a15c7502b099e835115b8d64c224049da170cde27",
+      "counts": {
+        "moveto": 2,
+        "text": 2
+      }
+    },
+    "text/png": {
+      "hash": "c3e1b5ff6a62ad1e01cae2b991509ea68501b4426f5de35042c372e5f228165d",
+      "width": 297,
+      "height": 210
+    },
+    "text/svg": {
+      "hash": "fb9ca8c4ef9f4bf4027418dab711cf96827035d51a997eaae47f380d9fe6642a",
+      "counts": {
+        "font": 0,
+        "g": 2,
+        "mask": 0,
+        "path": 2,
+        "text": 0
+      }
+    },
+    "transform/pdf": {
+      "hash": "6acc51cb86566d01fdba44cb9f7a3a786e4e05ed322b6b790a9f82a0a6785b2d",
+      "counts": {
+        "closepath": 2,
+        "fill": 2,
+        "grestore": 1,
+        "gsave": 1,
+        "lineto": 8,
+        "matrix": 3,
+        "moveto": 2
+      }
+    },
+    "transform/png": {
+      "hash": "07cf36fbbad797b9b59c0d80fc70ab4583b128d5ac00e15a574bb85016a662b4",
+      "width": 297,
+      "height": 210
+    },
+    "transform/svg": {
+      "hash": "eb92c82c5b2f21d6563adcf6b336e8a9e6fd85357405463c01b9ad3afbcc9e4f",
+      "counts": {
+        "font": 0,
+        "g": 2,
+        "mask": 0,
+        "path": 2,
+        "text": 0
+      }
+    }
+  }
+}

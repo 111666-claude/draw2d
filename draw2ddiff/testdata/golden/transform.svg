@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="297" height="210" fill="none" stroke="none">
+	<defs></defs>
+	<g fill="#2A9D8F" fill-rule="evenodd" transform="matrix(1.299,0.75,-0,0.650,150,100)">
+		<path d="M -40,-25 L 40,-25 L 40,25 L -40,25 Z "></path>
+	</g>
+	<g fill="#E9C46A" fill-rule="evenodd">
+		<path d="M 10,10 L 30,10 L 30,30 L 10,30 Z "></path>
+	</g>
+</svg>

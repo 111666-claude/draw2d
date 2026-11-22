@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="297" height="210" fill="none" stroke="none">
+	<defs></defs>
+	<g fill="rgba(255,0,0,0.502)" fill-rule="evenodd">
+		<path d="M 50,50 L 150,50 L 150,130 L 50,130 Z "></path>
+	</g>
+	<g stroke="rgba(0,0,255,0.502)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+		<path d="M 100,80 L 220,80 L 220,160 L 100,160 Z "></path>
+	</g>
+</svg>

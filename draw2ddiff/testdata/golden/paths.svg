@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="297" height="210" fill="none" stroke="none">
+	<defs></defs>
+	<g fill="#246AC2" fill-rule="evenodd" stroke="#102030" stroke-width="3" stroke-linecap="round" stroke-linejoin="bevel">
+		<path d="M 20,20 L 120,30 Q 150,80 110,100 C 60,120 180,160 140,180 L 110,150 A 30 20 0 0 1 50 150.01 Z "></path>
+	</g>
+	<g stroke="#C2246A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="bevel" stroke-dasharray="6,3" stroke-dashoffset="1">
+		<path d="M 200,40 L 270,60 L 240,120 Z "></path>
+	</g>
+</svg>
