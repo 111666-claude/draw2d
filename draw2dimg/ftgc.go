@@ -39,6 +39,18 @@ type GraphicContext struct {
 	glyphBuf         *truetype.GlyphBuf
 	DPI              int
 	Filter           ImageFilter
+
+	// Incremental dirty-rectangle support. All fields below are only touched
+	// when incremental is true; the historical full-canvas code path does not
+	// read or mutate any of them.
+	incremental   bool
+	dirtyMu       *recMutex
+	dirty         []image.Rectangle
+	fullDirty     bool
+	fillScratch   *raster.Rasterizer
+	strokeScratch *raster.Rasterizer
+	stats         Stats
+	basePainter   Painter
 }
 
 // ImageFilter defines the type of filter to use
@@ -71,16 +83,18 @@ func NewGraphicContextWithPainter(img draw.Image, painter Painter) *GraphicConte
 	width, height := img.Bounds().Dx(), img.Bounds().Dy()
 	dpi := 92
 	gc := &GraphicContext{
-		draw2dbase.NewStackGraphicContext(),
-		img,
-		painter,
-		raster.NewRasterizer(width, height),
-		raster.NewRasterizer(width, height),
-		draw2d.GetGlobalFontCache(),
-		draw2dbase.NewGlyphCache(),
-		&truetype.GlyphBuf{},
-		dpi,
-		BilinearFilter,
+		StackGraphicContext: draw2dbase.NewStackGraphicContext(),
+		img:                 img,
+		painter:             painter,
+		basePainter:         painter,
+		fillRasterizer:      raster.NewRasterizer(width, height),
+		strokeRasterizer:    raster.NewRasterizer(width, height),
+		FontCache:           draw2d.GetGlobalFontCache(),
+		glyphCache:          draw2dbase.NewGlyphCache(),
+		glyphBuf:            &truetype.GlyphBuf{},
+		DPI:                 dpi,
+		Filter:              BilinearFilter,
+		dirtyMu:             newRecMutex(),
 	}
 	return gc
 }
@@ -92,12 +106,28 @@ func (gc *GraphicContext) GetDPI() int {
 
 // Clear fills the current canvas with a default transparent color
 func (gc *GraphicContext) Clear() {
+	_, unlock := gc.beginDraw()
+	defer unlock()
 	width, height := gc.img.Bounds().Dx(), gc.img.Bounds().Dy()
-	gc.ClearRect(0, 0, width, height)
+	if gc.incremental {
+		gc.markFullDirty()
+	}
+	gc.clearRect(0, 0, width, height)
 }
 
 // ClearRect fills the current canvas with a default transparent color at the specified rectangle
 func (gc *GraphicContext) ClearRect(x1, y1, x2, y2 int) {
+	_, unlock := gc.beginDraw()
+	defer unlock()
+	if gc.incremental {
+		gc.addDirtyRect(image.Rect(x1, y1, x2, y2))
+	}
+	gc.clearRect(x1, y1, x2, y2)
+}
+
+// clearRect performs the actual fill without locking; callers either hold the
+// submission lock or run with incremental rendering disabled.
+func (gc *GraphicContext) clearRect(x1, y1, x2, y2 int) {
 	imageColor := image.NewUniform(gc.Current.FillColor)
 	draw.Draw(gc.img, image.Rect(x1, y1, x2, y2), imageColor, image.ZP, draw.Over)
 }
@@ -118,6 +148,11 @@ func DrawImage(src image.Image, dest draw.Image, tr draw2d.Matrix, op draw.Op, f
 
 // DrawImage draws the raster image in the current canvas
 func (gc *GraphicContext) DrawImage(img image.Image) {
+	_, unlock := gc.beginDraw()
+	defer unlock()
+	if gc.incremental {
+		gc.recordImage(img, gc.Current.Tr)
+	}
 	DrawImage(img, gc.img, gc.Current.Tr, draw.Over, gc.Filter)
 }
 
@@ -294,25 +329,28 @@ func (gc *GraphicContext) SetFont(font *truetype.Font) {
 	gc.Current.Font = font
 }
 
-// SetFontSize sets the font size in points (as in ``a 12 point font'').
+// SetFontSize sets the font size in points (as in “a 12 point font”).
 func (gc *GraphicContext) SetFontSize(fontSize float64) {
 	gc.Current.FontSize = fontSize
 	gc.recalc()
 }
 
-func (gc *GraphicContext) paint(rasterizer *raster.Rasterizer, color color.Color) {
-	gc.painter.SetColor(color)
-	rasterizer.Rasterize(gc.painter)
-	rasterizer.Clear()
-	gc.Current.Path.Clear()
-}
-
 // Stroke strokes the paths with the color specified by SetStrokeColor
 func (gc *GraphicContext) Stroke(paths ...*draw2d.Path) {
 	paths = append(paths, gc.Current.Path)
-	gc.strokeRasterizer.UseNonZeroWinding = true
+	_, unlock := gc.beginDraw()
+	defer unlock()
 
-	stroker := draw2dbase.NewLineStroker(gc.Current.Cap, gc.Current.Join, draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: FtLineBuilder{Adder: gc.strokeRasterizer}})
+	var region image.Rectangle
+	if gc.incremental {
+		full, before := gc.snapshotDirty()
+		gc.recordStroke(paths)
+		region, _ = gc.regionSince(full, before)
+	}
+	gc.strokeRasterizer.UseNonZeroWinding = true
+	target := gc.prepareTarget(gc.strokeRasterizer, &gc.strokeScratch, region)
+
+	stroker := draw2dbase.NewLineStroker(gc.Current.Cap, gc.Current.Join, draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: gc.lineBuilder(target)})
 	stroker.HalfLineWidth = gc.Current.LineWidth / 2
 
 	var liner draw2dbase.Flattener
@@ -325,32 +363,60 @@ func (gc *GraphicContext) Stroke(paths ...*draw2d.Path) {
 		draw2dbase.Flatten(p, liner, gc.Current.Tr.GetScale())
 	}
 
-	gc.paint(gc.strokeRasterizer, gc.Current.StrokeColor)
+	gc.finishTarget(target, gc.Current.StrokeColor, gc.strokeRasterizer)
+	gc.Current.Path.Clear()
 }
 
 // Fill fills the paths with the color specified by SetFillColor
 func (gc *GraphicContext) Fill(paths ...*draw2d.Path) {
 	paths = append(paths, gc.Current.Path)
+	_, unlock := gc.beginDraw()
+	defer unlock()
+
+	var region image.Rectangle
+	if gc.incremental {
+		full, before := gc.snapshotDirty()
+		gc.recordFill(paths)
+		region, _ = gc.regionSince(full, before)
+	}
 	gc.fillRasterizer.UseNonZeroWinding = gc.Current.FillRule == draw2d.FillRuleWinding
+	target := gc.prepareTarget(gc.fillRasterizer, &gc.fillScratch, region)
 
 	/**** first method ****/
-	flattener := draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: FtLineBuilder{Adder: gc.fillRasterizer}}
+	flattener := draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: gc.lineBuilder(target)}
 	for _, p := range paths {
 		draw2dbase.Flatten(p, flattener, gc.Current.Tr.GetScale())
 	}
 
-	gc.paint(gc.fillRasterizer, gc.Current.FillColor)
+	gc.finishTarget(target, gc.Current.FillColor, gc.fillRasterizer)
+	gc.Current.Path.Clear()
 }
 
 // FillStroke first fills the paths and than strokes them
 func (gc *GraphicContext) FillStroke(paths ...*draw2d.Path) {
 	paths = append(paths, gc.Current.Path)
+	_, unlock := gc.beginDraw()
+	defer unlock()
+
+	var fillRegion, strokeRegion image.Rectangle
+	if gc.incremental {
+		full, before := gc.snapshotDirty()
+		gc.recordFill(paths)
+		fillRegion, _ = gc.regionSince(full, before)
+		// The stroke extends beyond the fill; record it against the state
+		// captured before this submission so each rasterizer only sees the
+		// region its own geometry contributes.
+		gc.recordStroke(paths)
+		strokeRegion, _ = gc.regionSince(full, before)
+	}
 	gc.fillRasterizer.UseNonZeroWinding = gc.Current.FillRule == draw2d.FillRuleWinding
 	gc.strokeRasterizer.UseNonZeroWinding = true
+	fillTarget := gc.prepareTarget(gc.fillRasterizer, &gc.fillScratch, fillRegion)
+	strokeTarget := gc.prepareTarget(gc.strokeRasterizer, &gc.strokeScratch, strokeRegion)
 
-	flattener := draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: FtLineBuilder{Adder: gc.fillRasterizer}}
+	flattener := draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: gc.lineBuilder(fillTarget)}
 
-	stroker := draw2dbase.NewLineStroker(gc.Current.Cap, gc.Current.Join, draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: FtLineBuilder{Adder: gc.strokeRasterizer}})
+	stroker := draw2dbase.NewLineStroker(gc.Current.Cap, gc.Current.Join, draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: gc.lineBuilder(strokeTarget)})
 	stroker.HalfLineWidth = gc.Current.LineWidth / 2
 
 	var liner draw2dbase.Flattener
@@ -366,9 +432,10 @@ func (gc *GraphicContext) FillStroke(paths ...*draw2d.Path) {
 	}
 
 	// Fill
-	gc.paint(gc.fillRasterizer, gc.Current.FillColor)
+	gc.finishTarget(fillTarget, gc.Current.FillColor, gc.fillRasterizer)
 	// Stroke
-	gc.paint(gc.strokeRasterizer, gc.Current.StrokeColor)
+	gc.finishTarget(strokeTarget, gc.Current.StrokeColor, gc.strokeRasterizer)
+	gc.Current.Path.Clear()
 }
 
 func toFtCap(c draw2d.LineCap) raster.Capper {
