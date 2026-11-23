@@ -33,15 +33,19 @@ const (
 )
 
 type Svg struct {
-	XMLName  xml.Name `xml:"svg"`
-	Xmlns    string   `xml:"xmlns,attr"`
-	Width    string   `xml:"width,attr,omitempty"`
-	Height   string   `xml:"height,attr,omitempty"`
-	ViewBox  string   `xml:"viewBox,attr,omitempty"`
-	Fonts    []*Font  `xml:"defs>font"`
-	Masks    []*Mask  `xml:"defs>mask"`
-	Groups   []*Group `xml:"g"`
-	FontMode FontMode `xml:"-"`
+	XMLName  xml.Name  `xml:"svg"`
+	Xmlns    string    `xml:"xmlns,attr"`
+	Width    string    `xml:"width,attr,omitempty"`
+	Height   string    `xml:"height,attr,omitempty"`
+	ViewBox  string    `xml:"viewBox,attr,omitempty"`
+	Fonts    []*Font   `xml:"defs>font"`
+	Masks    []*Mask   `xml:"defs>mask"`
+	Markers  []*Marker `xml:"defs>marker"`
+	Groups   []*Group  `xml:"g"`
+	FontMode FontMode  `xml:"-"`
+	// markerIds maps a marker content key to its definition id, so identical
+	// markers share a single defs entry and ids are never duplicated.
+	markerIds map[string]string
 	FillStroke
 }
 
@@ -65,7 +69,24 @@ type Group struct {
 
 type Path struct {
 	FillStroke
-	Desc string `xml:"d,attr"`
+	Desc        string `xml:"d,attr"`
+	MarkerStart string `xml:"marker-start,attr,omitempty"`
+	MarkerMid   string `xml:"marker-mid,attr,omitempty"`
+	MarkerEnd   string `xml:"marker-end,attr,omitempty"`
+}
+
+// Marker is a reusable symbol instantiated at the vertices of a path
+// referencing it with marker-start, marker-mid or marker-end.
+type Marker struct {
+	Id           string  `xml:"id,attr"`
+	ViewBox      string  `xml:"viewBox,attr,omitempty"`
+	RefX         float64 `xml:"refX,attr,omitempty"`
+	RefY         float64 `xml:"refY,attr,omitempty"`
+	MarkerWidth  float64 `xml:"markerWidth,attr"`
+	MarkerHeight float64 `xml:"markerHeight,attr"`
+	MarkerUnits  string  `xml:"markerUnits,attr"`
+	Orient       string  `xml:"orient,attr"`
+	Paths        []*Path `xml:"path"`
 }
 
 type Text struct {

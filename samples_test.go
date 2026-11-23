@@ -14,6 +14,7 @@ import (
 	"github.com/llgcode/draw2d/samples/helloworld"
 	"github.com/llgcode/draw2d/samples/line"
 	"github.com/llgcode/draw2d/samples/linecapjoin"
+	"github.com/llgcode/draw2d/samples/markers"
 	"github.com/llgcode/draw2d/samples/postscript"
 )
 
@@ -57,4 +58,8 @@ func TestSampleLineCapJoin(t *testing.T) {
 
 func TestSamplePostscript(t *testing.T) {
 	test(t, postscript.Main)
+}
+
+func TestSampleMarkers(t *testing.T) {
+	test(t, markers.Main)
 }

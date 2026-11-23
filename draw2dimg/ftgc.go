@@ -294,7 +294,7 @@ func (gc *GraphicContext) SetFont(font *truetype.Font) {
 	gc.Current.Font = font
 }
 
-// SetFontSize sets the font size in points (as in ``a 12 point font'').
+// SetFontSize sets the font size in points (as in “a 12 point font”).
 func (gc *GraphicContext) SetFontSize(fontSize float64) {
 	gc.Current.FontSize = fontSize
 	gc.recalc()
@@ -310,6 +310,10 @@ func (gc *GraphicContext) paint(rasterizer *raster.Rasterizer, color color.Color
 // Stroke strokes the paths with the color specified by SetStrokeColor
 func (gc *GraphicContext) Stroke(paths ...*draw2d.Path) {
 	paths = append(paths, gc.Current.Path)
+	if len(gc.Current.Markers) > 0 {
+		// paint clears gc.Current.Path; keep a copy for the marker vertices
+		paths[len(paths)-1] = gc.Current.Path.Copy()
+	}
 	gc.strokeRasterizer.UseNonZeroWinding = true
 
 	stroker := draw2dbase.NewLineStroker(gc.Current.Cap, gc.Current.Join, draw2dbase.Transformer{Tr: gc.Current.Tr, Flattener: FtLineBuilder{Adder: gc.strokeRasterizer}})
@@ -326,11 +330,27 @@ func (gc *GraphicContext) Stroke(paths ...*draw2d.Path) {
 	}
 
 	gc.paint(gc.strokeRasterizer, gc.Current.StrokeColor)
+	gc.drawMarkers(paths...)
+}
+
+// drawMarkers rasterizes the markers attached to the context at the vertices
+// of the given paths. It is the raster fallback for the SVG marker feature.
+func (gc *GraphicContext) drawMarkers(paths ...*draw2d.Path) {
+	if len(gc.Current.Markers) == 0 {
+		return
+	}
+	if err := draw2dbase.DrawMarkers(gc, gc.Current.Markers, gc.Current.StrokeColor, gc.Current.LineWidth, paths...); err != nil {
+		log.Println(err)
+	}
 }
 
 // Fill fills the paths with the color specified by SetFillColor
 func (gc *GraphicContext) Fill(paths ...*draw2d.Path) {
 	paths = append(paths, gc.Current.Path)
+	if len(gc.Current.Markers) > 0 {
+		// paint clears gc.Current.Path; keep a copy for the marker vertices
+		paths[len(paths)-1] = gc.Current.Path.Copy()
+	}
 	gc.fillRasterizer.UseNonZeroWinding = gc.Current.FillRule == draw2d.FillRuleWinding
 
 	/**** first method ****/
@@ -340,11 +360,16 @@ func (gc *GraphicContext) Fill(paths ...*draw2d.Path) {
 	}
 
 	gc.paint(gc.fillRasterizer, gc.Current.FillColor)
+	gc.drawMarkers(paths...)
 }
 
 // FillStroke first fills the paths and than strokes them
 func (gc *GraphicContext) FillStroke(paths ...*draw2d.Path) {
 	paths = append(paths, gc.Current.Path)
+	if len(gc.Current.Markers) > 0 {
+		// paint clears gc.Current.Path; keep a copy for the marker vertices
+		paths[len(paths)-1] = gc.Current.Path.Copy()
+	}
 	gc.fillRasterizer.UseNonZeroWinding = gc.Current.FillRule == draw2d.FillRuleWinding
 	gc.strokeRasterizer.UseNonZeroWinding = true
 
@@ -369,6 +394,7 @@ func (gc *GraphicContext) FillStroke(paths ...*draw2d.Path) {
 	gc.paint(gc.fillRasterizer, gc.Current.FillColor)
 	// Stroke
 	gc.paint(gc.strokeRasterizer, gc.Current.StrokeColor)
+	gc.drawMarkers(paths...)
 }
 
 func toFtCap(c draw2d.LineCap) raster.Capper {

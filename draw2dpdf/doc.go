@@ -38,4 +38,11 @@
 // Acknowledgments
 //
 // The pdf backend uses https://github.com/jung-kurt/gofpdf
+//
+// Path markers
+//
+// Path markers attached with SetMarker (see draw2d.MarkerGraphicContext)
+// are accepted but ignored by this backend: PDF has no marker primitive and
+// this backend does not rasterize them. Use the draw2dsvg backend for native
+// marker output or the draw2dimg backend for a rasterized fallback.
 package draw2dpdf

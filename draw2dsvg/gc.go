@@ -4,12 +4,13 @@
 package draw2dsvg
 
 import (
-		"github.com/golang/freetype/truetype"
+	"github.com/golang/freetype/truetype"
 	"github.com/llgcode/draw2d"
 	"github.com/llgcode/draw2d/draw2dbase"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 	"image"
+	"image/color"
 	"log"
 	"math"
 	"strconv"
@@ -49,6 +50,8 @@ func NewGraphicContext(svg *Svg) *GraphicContext {
 // Clear fills the current canvas with a default transparent color
 func (gc *GraphicContext) Clear() {
 	gc.svg.Groups = nil
+	gc.svg.Markers = nil
+	gc.svg.markerIds = nil
 }
 
 // Stroke strokes the paths with the color specified by SetStrokeColor
@@ -240,8 +243,100 @@ func (gc *GraphicContext) drawPaths(drawType drawType, paths ...*draw2d.Path) {
 	}
 	svgPath.Desc = strings.Join(svgPathsDesc, " ")
 
+	// attach path markers as native svg marker references
+	for pos, marker := range gc.Current.Markers {
+		if marker == nil || marker.Validate() != nil {
+			continue
+		}
+		circular := false
+		for _, path := range paths {
+			if path == marker.Path {
+				// a path cannot be its own marker
+				circular = true
+				break
+			}
+		}
+		if circular {
+			continue
+		}
+		ref := "url(#" + gc.svg.registerMarker(marker, gc.Current.StrokeColor) + ")"
+		switch pos {
+		case draw2d.MarkerStart:
+			svgPath.MarkerStart = ref
+		case draw2d.MarkerMid:
+			svgPath.MarkerMid = ref
+		case draw2d.MarkerEnd:
+			svgPath.MarkerEnd = ref
+		}
+	}
+
 	// attach to group
 	group.Paths = []*Path{&svgPath}
+}
+
+// registerMarker adds a marker definition to the svg defs and returns its
+// id. Identical markers (same artwork, geometry, orientation and colors)
+// share a single definition, and ids are handed out from a counter, so no
+// duplicate ids are ever generated.
+func (svg *Svg) registerMarker(m *draw2d.Marker, defaultFill color.Color) string {
+	fill := m.Fill
+	if fill == nil {
+		fill = defaultFill
+	}
+	markerPath := &Path{
+		FillStroke: FillStroke{
+			Fill: toSvgRGBA(fill),
+		},
+		Desc: toSvgPathDesc(m.Path),
+	}
+	if m.Stroke != nil {
+		markerPath.Stroke = toSvgRGBA(m.Stroke)
+	}
+	if m.StrokeWidth > 0 {
+		markerPath.StrokeWidth = toSvgLength(m.StrokeWidth)
+	}
+
+	orient := optiSprintf("%F", m.OrientAngle)
+	if m.OrientAuto {
+		orient = "auto"
+	}
+	units := "userSpaceOnUse"
+	if m.ScaleWithStroke {
+		units = "strokeWidth"
+	}
+	viewBox := ""
+	if m.ViewBox != ([4]float64{}) {
+		viewBox = optiSprintf("%F %F %F %F", m.ViewBox[0], m.ViewBox[1], m.ViewBox[2], m.ViewBox[3])
+	}
+
+	// content key for deduplication
+	key := strings.Join([]string{
+		markerPath.Desc, markerPath.Fill, markerPath.Stroke, markerPath.StrokeWidth,
+		viewBox, orient, units,
+		optiSprintf("%F", m.RefX), optiSprintf("%F", m.RefY),
+		optiSprintf("%F", m.Width), optiSprintf("%F", m.Height),
+	}, "|")
+	if id, ok := svg.markerIds[key]; ok {
+		return id
+	}
+
+	svgMarker := &Marker{
+		ViewBox:      viewBox,
+		RefX:         m.RefX,
+		RefY:         m.RefY,
+		MarkerWidth:  m.Width,
+		MarkerHeight: m.Height,
+		MarkerUnits:  units,
+		Orient:       orient,
+		Paths:        []*Path{markerPath},
+	}
+	svg.Markers = append(svg.Markers, svgMarker)
+	svgMarker.Id = "marker-" + strconv.Itoa(len(svg.Markers))
+	if svg.markerIds == nil {
+		svg.markerIds = make(map[string]string)
+	}
+	svg.markerIds[key] = svgMarker.Id
+	return svgMarker.Id
 }
 
 // Add text element to svg and returns its expected width

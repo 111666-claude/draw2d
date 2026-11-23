@@ -38,6 +38,10 @@ type ContextStack struct {
 	// 26.6 fixed point units in 1 em.
 	Scale float64
 
+	// Markers holds the path markers attached at each vertex position.
+	// Backends without marker support keep but ignore them.
+	Markers map[draw2d.MarkerPosition]*draw2d.Marker
+
 	Previous *ContextStack
 }
 
@@ -46,7 +50,6 @@ func (cs *ContextStack) GetFontName() string {
 	fontData := cs.FontData
 	return fmt.Sprintf("%s:%d:%d:%9.2f", fontData.Name, fontData.Family, fontData.Style, cs.FontSize)
 }
-
 
 /**
  * Create a new Graphic context from an image
@@ -120,6 +123,35 @@ func (gc *StackGraphicContext) SetLineDash(dash []float64, dashOffset float64) {
 	gc.Current.DashOffset = dashOffset
 }
 
+// SetMarker attaches a path marker at the given vertex position of
+// subsequently drawn paths. A nil marker removes the marker at that
+// position. It returns a validation error (and stores nothing) when the
+// marker is not renderable or pos is not a single marker position.
+func (gc *StackGraphicContext) SetMarker(pos draw2d.MarkerPosition, m *draw2d.Marker) error {
+	switch pos {
+	case draw2d.MarkerStart, draw2d.MarkerMid, draw2d.MarkerEnd:
+	default:
+		return draw2d.ErrMarkerPosition
+	}
+	if m == nil {
+		delete(gc.Current.Markers, pos)
+		return nil
+	}
+	if err := m.Validate(); err != nil {
+		return err
+	}
+	if gc.Current.Markers == nil {
+		gc.Current.Markers = make(map[draw2d.MarkerPosition]*draw2d.Marker)
+	}
+	gc.Current.Markers[pos] = m
+	return nil
+}
+
+// ClearMarkers removes all path markers from the context.
+func (gc *StackGraphicContext) ClearMarkers() {
+	gc.Current.Markers = nil
+}
+
 func (gc *StackGraphicContext) SetFontSize(fontSize float64) {
 	gc.Current.FontSize = fontSize
 }
@@ -191,6 +223,12 @@ func (gc *StackGraphicContext) Save() {
 	context.Path = gc.Current.Path.Copy()
 	context.Font = gc.Current.Font
 	context.Scale = gc.Current.Scale
+	if gc.Current.Markers != nil {
+		context.Markers = make(map[draw2d.MarkerPosition]*draw2d.Marker, len(gc.Current.Markers))
+		for pos, m := range gc.Current.Markers {
+			context.Markers[pos] = m
+		}
+	}
 	copy(context.Tr[:], gc.Current.Tr[:])
 	context.Previous = gc.Current
 	gc.Current = context
